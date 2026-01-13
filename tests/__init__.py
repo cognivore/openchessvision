@@ -1,0 +1,1 @@
+"""OpenChessVision test suite."""
