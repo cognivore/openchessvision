@@ -41,7 +41,7 @@ async function init() {
         draggable: true,
         dropOffBoard: 'trash',
         sparePieces: false,  // Piece palette moved to sidebar
-        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+        pieceTheme: '/static/vendor/img/chesspieces/wikipedia/{piece}.png',
         onDrop: onDrop,
         onChange: onBoardChange,
         showNotation: false,  // Hide coordinate labels
@@ -79,7 +79,7 @@ function setupPiecePalette() {
 
     const blackPieces = ['bK', 'bQ', 'bR', 'bB', 'bN', 'bP'];
     const whitePieces = ['wK', 'wQ', 'wR', 'wB', 'wN', 'wP'];
-    const pieceTheme = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
+    const pieceTheme = '/static/vendor/img/chesspieces/wikipedia/{piece}.png';
 
     function addPieceToPalette(palette, piece) {
         if (!palette) return;

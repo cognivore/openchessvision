@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Diagram Annotator</title>
 
-    <!-- Chessboard.js CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <!-- Chessboard.js CSS (vendored) -->
+    <link rel="stylesheet" href="/static/vendor/css/chessboard-1.0.0.min.css">
+
+    <!-- Fonts (vendored) -->
+    <link rel="stylesheet" href="/static/vendor/css/fonts.css">
 
     <!-- Custom styles -->
     <link rel="stylesheet" href="/static/css/style.css">
-
-    <!-- Google Fonts - distinctive choice -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -97,14 +97,14 @@
         <div class="status-bar" id="status-bar">Ready</div>
     </div>
 
-    <!-- jQuery (required by chessboard.js) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- jQuery (vendored, required by chessboard.js) -->
+    <script src="/static/vendor/js/jquery-3.7.1.min.js"></script>
 
-    <!-- Chessboard.js -->
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <!-- Chessboard.js (vendored) -->
+    <script src="/static/vendor/js/chessboard-1.0.0.min.js"></script>
 
-    <!-- Chess.js for validation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Chess.js for validation (vendored) -->
+    <script src="/static/vendor/js/chess.min.js"></script>
 
     <!-- App logic -->
     <script src="/static/js/app.js"></script>

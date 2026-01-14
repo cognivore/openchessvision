@@ -1,0 +1,33 @@
+/* Space Mono - Local vendor copy */
+@font-face {
+    font-family: 'Space Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/SpaceMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Space Mono';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/SpaceMono-Bold.woff2') format('woff2');
+}
+
+/* Crimson Pro - Local vendor copy */
+@font-face {
+    font-family: 'Crimson Pro';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/CrimsonPro-Regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Crimson Pro';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/CrimsonPro-SemiBold.woff2') format('woff2');
+}

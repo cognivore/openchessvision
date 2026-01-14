@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Book Reader</title>
+
+    <!-- PDF.js (vendored) -->
+    <script src="/static/vendor/js/pdf.min.js"></script>
+
+    <!-- Chessboard.js CSS (vendored) -->
+    <link rel="stylesheet" href="/static/vendor/css/chessboard-1.0.0.min.css">
+
+    <!-- Fonts (vendored) -->
+    <link rel="stylesheet" href="/static/vendor/css/fonts.css">
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/css/reader.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>♔ Chess Book Reader</h1>
+            <div class="header-controls">
+                <input type="file" id="pdf-input" accept=".pdf" hidden>
+                <button id="btn-open" class="btn-primary">📁 Open PDF</button>
+                <span id="pdf-info"></span>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <!-- Left sidebar: Black pieces + detected positions -->
+            <aside class="sidebar left-sidebar">
+                <section class="piece-palette-section">
+                    <h3>Black Pieces</h3>
+                    <div class="piece-palette" id="piece-palette-black"></div>
+                </section>
+                <section class="detected-section">
+                    <h3>Detected Positions</h3>
+                    <div class="position-list" id="position-list"></div>
+                </section>
+            </aside>
+
+            <!-- Center: PDF viewer with overlay -->
+            <div class="viewer-container">
+                <div class="pdf-controls">
+                    <button id="btn-prev-page" disabled>← Prev</button>
+                    <span id="page-info">Page 0 / 0</span>
+                    <button id="btn-next-page" disabled>Next →</button>
+                    <input type="number" id="page-input" min="1" value="1" style="width:50px" title="Go to page">
+                    <button id="btn-goto-page">Go</button>
+                    <input type="range" id="zoom-slider" min="50" max="200" value="100">
+                    <span id="zoom-value">100%</span>
+                </div>
+
+                <div class="pdf-viewport" id="pdf-viewport">
+                    <div class="pdf-page-container" id="pdf-page-container">
+                        <canvas id="pdf-canvas"></canvas>
+                        <!-- Detection overlay (bboxes) -->
+                        <svg id="detection-overlay" class="detection-overlay"></svg>
+                        <!-- Board overlay (when position is active) -->
+                        <div id="board-overlay" class="board-overlay hidden">
+                            <div id="active-board"></div>
+                        </div>
+                    </div>
+
+                    <div class="no-pdf-message" id="no-pdf-message">
+                        <p>📖 Open a PDF to start reading</p>
+                        <p class="hint">Chess diagrams will be automatically detected</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right sidebar: White pieces + analysis -->
+            <aside class="sidebar right-sidebar">
+                <section class="piece-palette-section">
+                    <h3>White Pieces</h3>
+                    <div class="piece-palette" id="piece-palette-white"></div>
+                </section>
+                <section class="analysis-section">
+                    <h3>Analysis</h3>
+                    <div id="analysis-container" class="analysis-container">
+                        <div class="no-analysis">
+                            <p>Select a position to analyze</p>
+                        </div>
+                        <div id="pgn-viewer" class="pgn-viewer hidden"></div>
+                        <div id="engine-panel" class="engine-panel hidden">
+                            <div class="engine-header">
+                                <span>Stockfish 16</span>
+                                <button id="btn-toggle-engine" class="btn-small">▶ Start</button>
+                            </div>
+                            <div class="engine-eval" id="engine-eval">-</div>
+                            <div class="engine-line" id="engine-line">-</div>
+                        </div>
+                    </div>
+                    <div class="analysis-actions">
+                        <button id="btn-analyse-white" class="btn-primary btn-analyse" disabled>🧠♔ Play as White</button>
+                        <button id="btn-analyse-black" class="btn-primary btn-analyse" disabled>🧠♚ Play as Black</button>
+                        <button id="btn-copy-fen" class="btn-secondary" disabled>📋 FEN</button>
+                        <button id="btn-copy-pgn" class="btn-secondary" disabled>📋 PGN</button>
+                    </div>
+                </section>
+            </aside>
+        </main>
+
+        <!-- Status bar -->
+        <footer class="status-bar" id="status-bar">Ready - Open a PDF to begin</footer>
+    </div>
+
+    <!-- jQuery (vendored, required by chessboard.js) -->
+    <script src="/static/vendor/js/jquery-3.7.1.min.js"></script>
+
+    <!-- Chessboard.js (vendored) -->
+    <script src="/static/vendor/js/chessboard-1.0.0.min.js"></script>
+
+    <!-- Chess.js for game logic (vendored) -->
+    <script src="/static/vendor/js/chess.min.js"></script>
+
+    <!-- App logic -->
+    <script src="/static/js/reader.js"></script>
+
+    {% if debug_mode %}
+    <script>
+        // Auto-load debug PDF
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(loadDebugPdf, 500);
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
