@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Diagram Annotator</title>
+
+    <!-- Chessboard.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <!-- Google Fonts - distinctive choice -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>♔ Chess Diagram Annotator</h1>
+            <div class="stats" id="stats">
+                <span class="stat pending">Pending: <strong id="stat-pending">-</strong></span>
+                <span class="stat annotated">Done: <strong id="stat-annotated">-</strong></span>
+                <span class="stat skipped">Skipped: <strong id="stat-skipped">-</strong></span>
+            </div>
+        </header>
+
+        <main>
+            <div class="workspace">
+                <!-- Board with piece palettes on sides -->
+                <div class="board-with-palettes">
+                    <!-- Black pieces palette (left) -->
+                    <div class="piece-palette side-palette" id="piece-palette-black">
+                        <!-- Filled by JS -->
+                    </div>
+
+                    <!-- Image container with overlay -->
+                    <div class="board-container" id="board-container">
+                        <img id="source-image" src="" alt="Chess diagram">
+                        <div id="chessboard" class="chessboard-overlay"></div>
+                    </div>
+
+                    <!-- White pieces palette (right) -->
+                    <div class="piece-palette side-palette" id="piece-palette-white">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="controls">
+                    <div class="opacity-controls">
+                        <label>
+                            <span>Normal opacity:</span>
+                            <input type="range" id="opacity-normal" min="0" max="100" value="25">
+                            <span id="opacity-normal-val">25%</span>
+                        </label>
+                        <label>
+                            <span>Hover opacity:</span>
+                            <input type="range" id="opacity-hover" min="0" max="100" value="85">
+                            <span id="opacity-hover-val">85%</span>
+                        </label>
+                    </div>
+
+                    <div class="fen-input">
+                        <label for="fen">FEN:</label>
+                        <input type="text" id="fen" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR">
+                        <button id="btn-apply-fen" title="Apply FEN to board">↻ Apply</button>
+                    </div>
+
+                    <div class="orientation-toggle">
+                        <button id="btn-flip" title="Flip board orientation">⟳ Flip Board</button>
+                        <button id="btn-clear" title="Clear all pieces">⌫ Clear</button>
+                        <button id="btn-start" title="Set starting position">♔ Start</button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="btn-save" class="primary" title="Save annotation">✓ Save</button>
+                        <button id="btn-skip" class="secondary" title="Skip this image">→ Skip</button>
+                        <button id="btn-delete" class="danger" title="Delete image">✕ Delete</button>
+                    </div>
+
+                    <div class="navigation">
+                        <button id="btn-prev" title="Previous image">← Prev</button>
+                        <span id="progress">1 / 100</span>
+                        <button id="btn-next" title="Next image">Next →</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <h3>Pending Images</h3>
+                <div class="image-list" id="image-list"></div>
+            </div>
+        </main>
+
+        <div class="status-bar" id="status-bar">Ready</div>
+    </div>
+
+    <!-- jQuery (required by chessboard.js) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- Chessboard.js -->
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
+    <!-- Chess.js for validation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <!-- App logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

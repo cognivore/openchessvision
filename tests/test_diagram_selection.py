@@ -143,7 +143,7 @@ class TestBoundingBoxIntersection:
         """Boxes sharing an edge are considered intersecting (inclusive bounds)."""
         box1 = BoundingBox(x0=0, y0=0, x1=50, y1=50)
         box2 = BoundingBox(x0=50, y0=0, x1=100, y1=50)
-        
+
         # Edge touching - our implementation uses inclusive bounds
         # so boxes sharing an edge ARE considered intersecting
         assert box1.intersects(box2)

@@ -57,3 +57,16 @@ result-*
 # Project specific
 *.pdf
 recognition_cache/
+
+# Large data folders (not tracked in git)
+data/
+tests/fixtures/
+models/
+runs/
+
+# Cache directories
+.cache/
+
+# Temporary files
+*.tmp
+*.bak

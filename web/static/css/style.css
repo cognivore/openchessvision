@@ -1,0 +1,505 @@
+/* Chess Diagram Annotator - Distinctive Dark Theme */
+
+:root {
+    --bg-primary: #0f0f12;
+    --bg-secondary: #1a1a21;
+    --bg-tertiary: #252530;
+    --accent-gold: #d4af37;
+    --accent-copper: #b87333;
+    --text-primary: #e8e6e3;
+    --text-secondary: #9a9a9a;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --border: #3a3a45;
+
+    --font-mono: 'Space Mono', monospace;
+    --font-serif: 'Crimson Pro', serif;
+
+    --overlay-normal: 0.25;
+    --overlay-hover: 0.85;
+
+    /* Toxic piece colors for overlay visibility */
+    --piece-white: #39ff14;  /* Toxic green */
+    --piece-black: #bf00ff;  /* Toxic purple */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-mono);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    background-image:
+        radial-gradient(circle at 20% 80%, rgba(212, 175, 55, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, rgba(184, 115, 51, 0.05) 0%, transparent 40%);
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+}
+
+h1 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--accent-gold);
+    letter-spacing: 0.02em;
+}
+
+.stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.stat {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.stat strong {
+    color: var(--text-primary);
+}
+
+.stat.pending strong { color: var(--warning); }
+.stat.annotated strong { color: var(--success); }
+.stat.skipped strong { color: var(--text-secondary); }
+
+/* Main layout */
+main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 1.5rem;
+    flex: 1;
+}
+
+.workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Board with side palettes layout */
+.board-with-palettes {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+/* Side piece palettes */
+.side-palette {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.side-palette .palette-piece {
+    width: 40px;
+    height: 40px;
+    cursor: grab;
+    transition: transform 0.1s ease;
+}
+
+.side-palette .palette-piece:hover {
+    transform: scale(1.2);
+}
+
+/* Board container with overlay */
+.board-container {
+    position: relative;
+    width: 400px;
+    height: 400px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#source-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 400px;
+    height: 400px;
+    object-fit: fill;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.chessboard-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 400px !important;
+    height: 400px !important;
+    opacity: var(--overlay-normal);
+    transition: opacity 0.15s ease;
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.board-container:hover .chessboard-overlay {
+    opacity: var(--overlay-hover);
+}
+
+/* Force chessboard.js to fill container */
+#chessboard {
+    width: 400px !important;
+    height: 400px !important;
+}
+
+/* Override chessboard.js styles for transparency */
+#chessboard [class*="board-"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Hide ALL squares - using multiple selectors */
+#chessboard [class*="square-"],
+#chessboard div[data-square],
+.chessboard-overlay [class*="square-"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Force transparent on both color squares */
+#chessboard .black-3c85d,
+#chessboard .white-1e1d7 {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* Hide coordinate labels */
+#chessboard [class*="notation-"],
+#chessboard .alpha-d2270,
+#chessboard .numeric-fc462 {
+    display: none !important;
+}
+
+/* Pieces should be fully visible with toxic colors for contrast */
+#chessboard img[data-piece],
+#chessboard [class*="piece-"],
+.chessboard-overlay img {
+    opacity: 1 !important;
+}
+
+/* White pieces - toxic green glow */
+#chessboard img[src*="wK"],
+#chessboard img[src*="wQ"],
+#chessboard img[src*="wR"],
+#chessboard img[src*="wB"],
+#chessboard img[src*="wN"],
+#chessboard img[src*="wP"] {
+    filter: drop-shadow(0 0 4px #39ff14)
+            drop-shadow(0 0 8px #39ff14)
+            drop-shadow(0 0 12px #39ff14)
+            drop-shadow(0 0 16px rgba(57, 255, 20, 0.7)) !important;
+}
+
+/* Black pieces - toxic purple glow */
+#chessboard img[src*="bK"],
+#chessboard img[src*="bQ"],
+#chessboard img[src*="bR"],
+#chessboard img[src*="bB"],
+#chessboard img[src*="bN"],
+#chessboard img[src*="bP"] {
+    filter: drop-shadow(0 0 4px #bf00ff)
+            drop-shadow(0 0 8px #bf00ff)
+            drop-shadow(0 0 12px #bf00ff)
+            drop-shadow(0 0 16px rgba(191, 0, 255, 0.7)) !important;
+}
+
+/* Controls */
+.controls {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.opacity-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.opacity-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.opacity-controls input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent-gold);
+}
+
+.opacity-controls span:last-child {
+    text-align: right;
+    color: var(--accent-gold);
+    font-weight: 700;
+}
+
+.fen-input {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.fen-input label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.fen-input input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.6rem 0.8rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    border-radius: 3px;
+}
+
+.fen-input input:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+}
+
+.orientation-toggle {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.navigation {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+#progress {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    min-width: 80px;
+    text-align: center;
+}
+
+/* Buttons */
+button {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-gold);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+button.primary {
+    background: var(--accent-gold);
+    color: var(--bg-primary);
+    border-color: var(--accent-gold);
+    font-weight: 700;
+}
+
+button.primary:hover {
+    background: #e5c04a;
+}
+
+button.secondary {
+    background: transparent;
+}
+
+button.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+button.danger:hover {
+    background: var(--danger);
+    color: var(--bg-primary);
+}
+
+/* Sidebar */
+.sidebar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar h3 {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-copper);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar h3:not(:first-child) {
+    margin-top: 1rem;
+}
+
+.image-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.image-list .thumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.image-list .thumb:hover {
+    border-color: var(--accent-gold);
+}
+
+.image-list .thumb.active {
+    border-color: var(--accent-gold);
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.image-list .thumb img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 2px;
+}
+
+.image-list .thumb span {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* Status bar */
+.status-bar {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.status-bar.error {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.status-bar.success {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-copper);
+}
+
+/* Loading state */
+.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    main {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        max-height: 200px;
+    }
+
+    .image-list {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}
