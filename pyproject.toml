@@ -29,11 +29,8 @@ dependencies = [
     # PDF rendering
     "pymupdf>=1.24.0",
 
-    # BLE connectivity
+    # BLE connectivity (for direct board control)
     "bleak>=0.22.0",
-
-    # UI framework
-    "PyQt6>=6.6.0",
 
     # Image processing (numpy/opencv/pillow come from nix, but we list for completeness)
     "numpy>=1.26.0",
@@ -42,8 +39,9 @@ dependencies = [
     # Local CNN chess recognition
     "chessimg2pos>=0.1.0",
 
-    # Async utilities
-    "qasync>=0.27.0",
+    # Web server
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -56,16 +54,9 @@ ml = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
-    "pytest-qt>=4.4.0",
     "ruff>=0.3.0",
     "mypy>=1.9.0",
 ]
-
-[project.scripts]
-openchessvision = "openchessvision.main:main"
-
-[project.gui-scripts]
-openchessvision-gui = "openchessvision.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/openchessvision"]

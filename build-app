@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# Build OpenChessVision as a macOS .app bundle
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_NAME="Chess Book Reader"
+APP_BUNDLE="$PROJECT_DIR/dist/${APP_NAME}.app"
+IDENTIFIER="com.openchessvision.reader"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${GREEN}[BUILD]${NC} $1"; }
+header() { echo -e "${BLUE}=== $1 ===${NC}"; }
+
+header "Building ${APP_NAME}.app"
+
+# Clean previous build
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+info "Creating launcher script..."
+
+cat > "$APP_BUNDLE/Contents/MacOS/launcher" << LAUNCHER
+#!/usr/bin/env bash
+# Chess Book Reader launcher
+set -euo pipefail
+
+APP_DIR="${PROJECT_DIR}"
+LOG_DIR="\$HOME/.openchessvision/logs"
+PID_FILE="\$HOME/.openchessvision/server.pid"
+PORT=5050
+URL="http://books.chess.localhost"
+
+mkdir -p "\$LOG_DIR"
+
+# Check if already running
+if [[ -f "\$PID_FILE" ]]; then
+    OLD_PID=\$(cat "\$PID_FILE")
+    if kill -0 "\$OLD_PID" 2>/dev/null; then
+        # Server already running, just open browser
+        open "\$URL"
+        exit 0
+    fi
+    rm -f "\$PID_FILE"
+fi
+
+# Start server in background
+cd "\$APP_DIR"
+PYTHONPATH="\$APP_DIR/src" "\$APP_DIR/.venv/bin/python" "\$APP_DIR/web/app.py" \\
+    >> "\$LOG_DIR/reader.stdout.log" 2>> "\$LOG_DIR/reader.stderr.log" &
+
+SERVER_PID=\$!
+echo "\$SERVER_PID" > "\$PID_FILE"
+
+# Wait for server to be ready
+for i in {1..30}; do
+    if curl -s "http://localhost:\$PORT/" >/dev/null 2>&1; then
+        open "\$URL"
+        exit 0
+    fi
+    sleep 0.5
+done
+
+# Timeout - open anyway and hope for the best
+open "\$URL"
+LAUNCHER
+
+chmod +x "$APP_BUNDLE/Contents/MacOS/launcher"
+
+info "Creating Info.plist..."
+
+cat > "$APP_BUNDLE/Contents/Info.plist" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>launcher</string>
+    <key>CFBundleIdentifier</key>
+    <string>${IDENTIFIER}</string>
+    <key>CFBundleName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleDisplayName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSUIElement</key>
+    <false/>
+</dict>
+</plist>
+PLIST
+
+info "Creating app icon..."
+
+# Create a simple chess-themed icon using sips (macOS built-in)
+# We'll use a placeholder - you can replace with a real icon later
+ICON_DIR="$APP_BUNDLE/Contents/Resources/AppIcon.iconset"
+mkdir -p "$ICON_DIR"
+
+# Generate a simple colored square as placeholder icon
+for size in 16 32 128 256 512; do
+    # Create a simple placeholder PNG using Python
+    "$PROJECT_DIR/.venv/bin/python" << PYICON
+import struct
+import zlib
+
+def create_png(width, height, color):
+    def chunk(chunk_type, data):
+        return struct.pack('>I', len(data)) + chunk_type + data + struct.pack('>I', zlib.crc32(chunk_type + data) & 0xffffffff)
+
+    # Simple solid color with chess pattern hint
+    raw = b''
+    for y in range(height):
+        raw += b'\x00'  # filter byte
+        for x in range(width):
+            # Create a subtle chess board pattern
+            is_dark = ((x * 8 // width) + (y * 8 // height)) % 2
+            if is_dark:
+                raw += bytes([max(0, color[0]-30), max(0, color[1]-30), max(0, color[2]-30), 255])
+            else:
+                raw += bytes(color + [255])
+
+    compressed = zlib.compress(raw, 9)
+
+    return (b'\x89PNG\r\n\x1a\n' +
+            chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)) +
+            chunk(b'IDAT', compressed) +
+            chunk(b'IEND', b''))
+
+# Warm amber/gold color for chess theme
+png_data = create_png($size, $size, [194, 150, 76])
+with open('$ICON_DIR/icon_${size}x${size}.png', 'wb') as f:
+    f.write(png_data)
+PYICON
+done
+
+# Create @2x versions
+for size in 16 32 128 256; do
+    double=$((size * 2))
+    cp "$ICON_DIR/icon_${double}x${double}.png" "$ICON_DIR/icon_${size}x${size}@2x.png" 2>/dev/null || true
+done
+
+# Convert to icns
+iconutil -c icns "$ICON_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+rm -rf "$ICON_DIR"
+
+# Add icon reference to Info.plist
+sed -i '' 's|</dict>|    <key>CFBundleIconFile</key>\n    <string>AppIcon</string>\n</dict>|' "$APP_BUNDLE/Contents/Info.plist"
+
+header "Build complete!"
+echo ""
+echo "App bundle created at:"
+echo -e "  ${GREEN}$APP_BUNDLE${NC}"
+echo ""
+echo "To install:"
+echo "  cp -r \"$APP_BUNDLE\" /Applications/"
+echo ""
+echo "Or drag the app to your Applications folder."
+echo ""
+echo "The app will:"
+echo "  1. Start the book reader server (if not already running)"
+echo "  2. Open http://books.chess.localhost in your browser"
+echo ""
+echo "Logs: ~/.openchessvision/logs/"

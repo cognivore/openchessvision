@@ -40,9 +40,7 @@ ANNOTATED_DIR.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 STUDIES_DIR.mkdir(parents=True, exist_ok=True)
 
-app = Flask(__name__,
-            template_folder="templates",
-            static_folder="static")
+app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
 # Store uploaded PDFs in memory for quick access
@@ -52,12 +50,14 @@ _pdf_cache: dict = {}
 # Try to load the CNN model for predictions
 _cnn_backend = None
 
+
 def get_cnn_backend():
     """Lazy-load the CNN backend."""
     global _cnn_backend
     if _cnn_backend is None:
         try:
             from openchessvision.recognition.local_cnn import LocalCNNBackend
+
             _cnn_backend = LocalCNNBackend()
             print("CNN backend loaded successfully", flush=True)
         except Exception as e:
@@ -69,6 +69,7 @@ def get_cnn_backend():
 # =============================================================================
 # Main Routes
 # =============================================================================
+
 
 @app.route("/")
 def index():
@@ -120,13 +121,15 @@ def debug_load():
     study_path = STUDIES_DIR / f"{pdf_id}.json"
     has_study = study_path.exists()
 
-    return jsonify({
-        "pdf_id": pdf_id,
-        "content_hash": content_hash,
-        "filename": debug_pdf_path.name,
-        "pages": page_count,
-        "has_study": has_study
-    })
+    return jsonify(
+        {
+            "pdf_id": pdf_id,
+            "content_hash": content_hash,
+            "filename": debug_pdf_path.name,
+            "pages": page_count,
+            "has_study": has_study,
+        }
+    )
 
 
 @app.route("/annotation")
@@ -138,6 +141,46 @@ def annotation():
 # =============================================================================
 # PDF Upload & Management APIs
 # =============================================================================
+
+
+@app.route("/api/check-pdf/<content_hash>")
+def check_pdf(content_hash: str):
+    """
+    Check if a PDF with the given content hash already exists.
+    Returns PDF info if found, 404 if not.
+    """
+    import fitz
+
+    # Validate hash format (8 or 16 hex chars for legacy/new support)
+    if not content_hash or len(content_hash) not in (8, 16):
+        return jsonify({"error": "Invalid hash format"}), 400
+
+    pdf_path = UPLOADS_DIR / f"{content_hash}.pdf"
+    if not pdf_path.exists():
+        return jsonify({"exists": False}), 404
+
+    # Get page count
+    try:
+        doc = fitz.open(str(pdf_path))
+        page_count = len(doc)
+        doc.close()
+    except Exception as e:
+        return jsonify({"error": f"Could not read PDF: {e}"}), 500
+
+    # Check for existing study
+    study_path = STUDIES_DIR / f"{content_hash}.json"
+    has_study = study_path.exists()
+
+    return jsonify(
+        {
+            "exists": True,
+            "pdf_id": content_hash,
+            "content_hash": content_hash,
+            "pages": page_count,
+            "has_study": has_study,
+        }
+    )
+
 
 @app.route("/api/upload-pdf", methods=["POST"])
 def upload_pdf():
@@ -165,6 +208,7 @@ def upload_pdf():
     # Get page count using PyMuPDF
     try:
         import fitz
+
         doc = fitz.open(str(pdf_path))
         page_count = len(doc)
         doc.close()
@@ -175,13 +219,15 @@ def upload_pdf():
     study_path = STUDIES_DIR / f"{pdf_id}.json"
     has_study = study_path.exists()
 
-    return jsonify({
-        "pdf_id": pdf_id,
-        "content_hash": content_hash,
-        "filename": file.filename,
-        "pages": page_count,
-        "has_study": has_study
-    })
+    return jsonify(
+        {
+            "pdf_id": pdf_id,
+            "content_hash": content_hash,
+            "filename": file.filename,
+            "pages": page_count,
+            "has_study": has_study,
+        }
+    )
 
 
 @app.route("/api/pdf/<pdf_id>")
@@ -202,6 +248,7 @@ def get_pdf_page(pdf_id: str, page: int):
 
     try:
         import fitz
+
         doc = fitz.open(str(pdf_path))
         if page < 0 or page >= len(doc):
             return jsonify({"error": "Page out of range"}), 400
@@ -215,6 +262,7 @@ def get_pdf_page(pdf_id: str, page: int):
         doc.close()
 
         from io import BytesIO
+
         return send_file(BytesIO(png_bytes), mimetype="image/png")
     except Exception as e:
         return jsonify({"error": f"Could not render page: {e}"}), 500
@@ -226,12 +274,14 @@ def get_pdf_page(pdf_id: str, page: int):
 
 _board_detector = None
 
+
 def get_board_detector():
     """Lazy-load the board detector."""
     global _board_detector
     if _board_detector is None:
         try:
             from openchessvision.preprocessing.board_detector import BoardDetector
+
             _board_detector = BoardDetector(output_size=256)
             print("Board detector loaded successfully", flush=True)
         except Exception as e:
@@ -249,6 +299,7 @@ def detect_diagrams(pdf_id: str, page: int):
 
     try:
         import fitz
+
         doc = fitz.open(str(pdf_path))
         if page < 0 or page >= len(doc):
             return jsonify({"error": "Page out of range"}), 400
@@ -271,14 +322,17 @@ def detect_diagrams(pdf_id: str, page: int):
         # Detect potential chess diagrams using contour detection
         diagrams = detect_squares_in_image(img)
 
-        return jsonify({
-            "page": page,
-            "width": pix.width,
-            "height": pix.height,
-            "diagrams": diagrams
-        })
+        return jsonify(
+            {
+                "page": page,
+                "width": pix.width,
+                "height": pix.height,
+                "diagrams": diagrams,
+            }
+        )
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         return jsonify({"error": f"Detection failed: {e}"}), 500
 
@@ -292,8 +346,7 @@ def detect_squares_in_image(img: np.ndarray) -> list:
 
     # Apply adaptive threshold
     thresh = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 11, 2
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2
     )
 
     # Find contours
@@ -311,13 +364,15 @@ def detect_squares_in_image(img: np.ndarray) -> list:
             # Calculate confidence based on squareness
             confidence = 1.0 - abs(1.0 - aspect_ratio)
 
-            diagrams.append({
-                "x": int(x),
-                "y": int(y),
-                "width": int(w),
-                "height": int(h),
-                "confidence": round(confidence, 2)
-            })
+            diagrams.append(
+                {
+                    "x": int(x),
+                    "y": int(y),
+                    "width": int(w),
+                    "height": int(h),
+                    "confidence": round(confidence, 2),
+                }
+            )
 
     # Sort by area (largest first) and limit
     diagrams.sort(key=lambda d: d["width"] * d["height"], reverse=True)
@@ -345,6 +400,7 @@ def recognize_region():
 
     try:
         import fitz
+
         doc = fitz.open(str(pdf_path))
 
         # Render page
@@ -364,7 +420,7 @@ def recognize_region():
 
         # Extract region
         x, y, w, h = bbox["x"], bbox["y"], bbox["width"], bbox["height"]
-        region = img[y:y+h, x:x+w]
+        region = img[y : y + h, x : x + w]
 
         # Try to clean/detect the board
         detector = get_board_detector()
@@ -376,21 +432,26 @@ def recognize_region():
         # Recognize with CNN
         backend = get_cnn_backend()
         if backend is None:
-            return jsonify({
-                "fen": "8/8/8/8/8/8/8/8",
-                "confidence": 0.0,
-                "error": "CNN backend not available"
-            })
+            return jsonify(
+                {
+                    "fen": "8/8/8/8/8/8/8/8",
+                    "confidence": 0.0,
+                    "error": "CNN backend not available",
+                }
+            )
 
         recognition = backend.recognize(region)
 
-        return jsonify({
-            "fen": recognition.fen if recognition.fen else "8/8/8/8/8/8/8/8",
-            "confidence": recognition.overall_confidence
-        })
+        return jsonify(
+            {
+                "fen": recognition.fen if recognition.fen else "8/8/8/8/8/8/8/8",
+                "confidence": recognition.overall_confidence,
+            }
+        )
 
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         return jsonify({"error": f"Recognition failed: {e}"}), 500
 
@@ -469,10 +530,7 @@ def delete_study(pdf_id: str):
 def list_pending():
     """List all pending images."""
     images = sorted([f.name for f in PENDING_DIR.glob("*.png")])
-    return jsonify({
-        "images": images,
-        "total": len(images)
-    })
+    return jsonify({"images": images, "total": len(images)})
 
 
 @app.route("/api/image/<path:filename>")
@@ -493,35 +551,38 @@ def predict_fen(filename: str):
 
     backend = get_cnn_backend()
     if backend is None:
-        return jsonify({
-            "fen": "8/8/8/8/8/8/8/8",  # Empty board fallback
-            "confidence": 0.0,
-            "error": "CNN backend not available"
-        })
+        return jsonify(
+            {
+                "fen": "8/8/8/8/8/8/8/8",  # Empty board fallback
+                "confidence": 0.0,
+                "error": "CNN backend not available",
+            }
+        )
 
     try:
         # Load image as numpy array for the backend
         image = cv2.imread(str(image_path))
         if image is None:
-            return jsonify({
-                "fen": "8/8/8/8/8/8/8/8",
-                "confidence": 0.0,
-                "error": "Could not load image"
-            })
+            return jsonify(
+                {
+                    "fen": "8/8/8/8/8/8/8/8",
+                    "confidence": 0.0,
+                    "error": "Could not load image",
+                }
+            )
 
         result = backend.recognize(image)
-        return jsonify({
-            "fen": result.fen if result.fen else "8/8/8/8/8/8/8/8",
-            "confidence": result.overall_confidence
-        })
+        return jsonify(
+            {
+                "fen": result.fen if result.fen else "8/8/8/8/8/8/8/8",
+                "confidence": result.overall_confidence,
+            }
+        )
     except Exception as e:
         import traceback
+
         traceback.print_exc()
-        return jsonify({
-            "fen": "8/8/8/8/8/8/8/8",
-            "confidence": 0.0,
-            "error": str(e)
-        })
+        return jsonify({"fen": "8/8/8/8/8/8/8/8", "confidence": 0.0, "error": str(e)})
 
 
 @app.route("/api/save", methods=["POST"])
@@ -552,6 +613,7 @@ def save_annotation():
 
     # Create unique filename based on FEN hash
     import hashlib
+
     fen_hash = hashlib.md5(piece_placement.encode()).hexdigest()[:8]
     base_name = source_path.stem
 
@@ -562,11 +624,9 @@ def save_annotation():
     shutil.move(str(source_path), str(dest_image))
     dest_fen.write_text(piece_placement)
 
-    return jsonify({
-        "success": True,
-        "saved_to": str(dest_image),
-        "fen": piece_placement
-    })
+    return jsonify(
+        {"success": True, "saved_to": str(dest_image), "fen": piece_placement}
+    )
 
 
 @app.route("/api/skip/<path:filename>", methods=["POST"])
@@ -600,11 +660,90 @@ def get_stats():
     skipped_count = len(list(SKIPPED_DIR.glob("*.png")))
     annotated_count = len(list(ANNOTATED_DIR.glob("*.png")))
 
-    return jsonify({
-        "pending": pending_count,
-        "skipped": skipped_count,
-        "annotated": annotated_count
-    })
+    return jsonify(
+        {
+            "pending": pending_count,
+            "skipped": skipped_count,
+            "annotated": annotated_count,
+        }
+    )
+
+
+# =============================================================================
+# Chessnut Move Board Sync APIs
+# =============================================================================
+
+
+@app.route("/api/board/set-fen", methods=["POST"])
+def board_set_fen():
+    """
+    Sync a FEN position to the Chessnut Move board service.
+
+    Expects JSON: {fen: string, force?: boolean}
+    Returns: {synced: boolean, error?: string, fen?: string, driver_synced?: boolean}
+
+    This endpoint is designed to be non-blocking for recognition flow:
+    if the board service is unavailable, it returns synced=false with an error
+    message but does not raise an exception.
+    """
+    data = request.get_json()
+
+    fen = data.get("fen")
+    if not fen:
+        return jsonify({"synced": False, "error": "Missing fen"}), 400
+
+    # Validate FEN using python-chess
+    try:
+        test_fen = fen if " " in fen else f"{fen} w - - 0 1"
+        chess.Board(test_fen)
+    except Exception as e:
+        return jsonify({"synced": False, "error": f"Invalid FEN: {e}"}), 400
+
+    force = data.get("force", True)
+
+    # Import here to avoid circular imports and keep startup fast
+    try:
+        from openchessvision.integrations.chessnut_service import sync_fen, get_config
+
+        config = get_config()
+        result = sync_fen(fen, config=config, force=force)
+
+        return jsonify(
+            {
+                "synced": result.synced,
+                "error": result.error,
+                "fen": result.fen,
+                "driver_synced": result.driver_synced,
+            }
+        )
+
+    except Exception as e:
+        # Catch-all to ensure recognition flow is never blocked
+        return jsonify({"synced": False, "error": str(e)})
+
+
+@app.route("/api/board/status")
+def board_status():
+    """
+    Get the current status of the Chessnut Move board service.
+
+    Returns connection and driver status from the board service,
+    or an error if the service is unreachable.
+    """
+    try:
+        from openchessvision.integrations.chessnut_service import get_config
+        import urllib.request
+        import json as json_module
+
+        config = get_config()
+        url = f"{config.base_url}/api/driver/status"
+
+        with urllib.request.urlopen(url, timeout=config.timeout) as response:
+            data = json_module.loads(response.read().decode("utf-8"))
+            return jsonify({"available": True, **data})
+
+    except Exception as e:
+        return jsonify({"available": False, "error": str(e)})
 
 
 if __name__ == "__main__":

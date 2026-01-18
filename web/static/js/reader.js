@@ -756,26 +756,55 @@ function deleteVariation() {
 // PDF Loading
 // =============================================================================
 
+/**
+ * Calculate SHA256 hash of a file in the browser.
+ * Returns first 16 hex characters to match server-side hashing.
+ */
+async function hashFile(file) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex.substring(0, 16);
+}
+
 async function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    status(`Uploading ${file.name}...`);
-
-    const formData = new FormData();
-    formData.append('file', file);
+    status(`Checking ${file.name}...`);
 
     try {
-        const response = await fetch('/api/upload-pdf', {
-            method: 'POST',
-            body: formData
-        });
+        // Hash file in browser first
+        const contentHash = await hashFile(file);
 
-        const data = await response.json();
+        // Check if PDF already exists on server
+        const checkResponse = await fetch(`/api/check-pdf/${contentHash}`);
+        let data;
 
-        if (data.error) {
-            status(`Error: ${data.error}`);
-            return;
+        if (checkResponse.ok) {
+            // PDF already exists - skip upload!
+            data = await checkResponse.json();
+            data.filename = file.name;  // Use local filename for display
+            status(`Found cached PDF: ${file.name}`);
+        } else {
+            // PDF not found - upload it
+            status(`Uploading ${file.name}...`);
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadResponse = await fetch('/api/upload-pdf', {
+                method: 'POST',
+                body: formData
+            });
+
+            data = await uploadResponse.json();
+
+            if (data.error) {
+                status(`Error: ${data.error}`);
+                return;
+            }
         }
 
         state.pdfId = data.pdf_id;
@@ -1122,6 +1151,9 @@ async function handleDiagramClick(rect, diagram, pageNum) {
         activatePosition(posId, rect);
 
         status(`Recognized: ${data.fen} (${Math.round(data.confidence * 100)}% confidence)`);
+
+        // Auto-sync recognized position to Chessnut Move board
+        syncToBoard(data.fen);
 
     } catch (err) {
         console.error(err);
@@ -2084,4 +2116,36 @@ window.addEventListener('beforeunload', (e) => {
 function status(msg) {
     els.statusBar.textContent = msg;
     console.log('[Reader]', msg);
+}
+
+// =============================================================================
+// Chessnut Move Board Sync
+// =============================================================================
+
+/**
+ * Sync a FEN position to the Chessnut Move board service.
+ * This is fire-and-forget: it updates the status bar but doesn't block
+ * or throw errors that would disrupt the recognition flow.
+ */
+async function syncToBoard(fen) {
+    try {
+        const response = await fetch('/api/board/set-fen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fen: fen, force: true })
+        });
+
+        const data = await response.json();
+
+        if (data.synced) {
+            const driverNote = data.driver_synced ? ' (board updated)' : ' (service only)';
+            status(`Board synced: ${fen}${driverNote}`);
+        } else {
+            // Log but don't alarm the user - service may just be offline
+            console.warn('[Reader] Board sync failed:', data.error);
+        }
+    } catch (err) {
+        // Connection error - service likely not running
+        console.warn('[Reader] Board service unavailable:', err.message);
+    }
 }

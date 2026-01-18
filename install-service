@@ -1,0 +1,318 @@
+#!/usr/bin/env bash
+# Install OpenChessVision Book Reader as a macOS LaunchAgent service
+# Usage: ./install-service [install|uninstall|status|logs|restart]
+
+set -euo pipefail
+
+SERVICE_NAME="com.openchessvision.reader"
+PLIST_FILE="$HOME/Library/LaunchAgents/${SERVICE_NAME}.plist"
+
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOG_DIR="$HOME/.openchessvision/logs"
+
+# Shared Caddy location
+CADDY_HOME="$HOME/Caddy"
+CADDY_SITES_DIR="$CADDY_HOME/sites"
+MY_CADDY_SITE="$CADDY_SITES_DIR/books.chess.Caddyfile"
+
+# Server config
+SERVER_PORT=5050
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+header() { echo -e "${BLUE}=== $1 ===${NC}"; }
+
+check_prerequisites() {
+    if ! command -v nix &>/dev/null; then
+        error "nix not found. Please install Nix first."
+        exit 1
+    fi
+
+    if [[ ! -f "$PROJECT_DIR/flake.nix" ]]; then
+        error "flake.nix not found in $PROJECT_DIR"
+        exit 1
+    fi
+
+    if [[ ! -f "$PROJECT_DIR/web/app.py" ]]; then
+        error "web/app.py not found in $PROJECT_DIR"
+        exit 1
+    fi
+}
+
+generate_caddy_site() {
+    mkdir -p "$CADDY_SITES_DIR"
+
+    cat > "$MY_CADDY_SITE" << EOF
+# OpenChessVision Book Reader - http://books.chess.localhost
+http://books.chess.localhost {
+	reverse_proxy localhost:${SERVER_PORT}
+}
+EOF
+    info "Generated Caddy site config at $MY_CADDY_SITE"
+}
+
+reload_caddy() {
+    if [[ -d "$CADDY_HOME" ]]; then
+        info "Reloading Caddy configuration..."
+        (cd "$CADDY_HOME" && nix develop --command caddy reload --config Caddyfile 2>/dev/null) || \
+            warn "Could not reload Caddy. You may need to run: cd ~/Caddy && caddy-reload"
+    fi
+}
+
+generate_plist() {
+    mkdir -p "$LOG_DIR"
+    mkdir -p "$(dirname "$PLIST_FILE")"
+
+    # Check for venv
+    if [[ ! -f "$PROJECT_DIR/.venv/bin/python" ]]; then
+        error "No .venv found. Run: python -m venv .venv && .venv/bin/pip install -e ."
+        exit 1
+    fi
+
+    cat > "$PLIST_FILE" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${SERVICE_NAME}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>${PROJECT_DIR}/.venv/bin/python</string>
+        <string>${PROJECT_DIR}/web/app.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>${PROJECT_DIR}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>${HOME}</string>
+        <key>PATH</key>
+        <string>${PROJECT_DIR}/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>PYTHONPATH</key>
+        <string>${PROJECT_DIR}/src</string>
+        <key>FLASK_ENV</key>
+        <string>production</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>${LOG_DIR}/reader.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>${LOG_DIR}/reader.stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
+EOF
+    info "Generated plist at $PLIST_FILE"
+}
+
+do_install() {
+    header "Installing OpenChessVision Book Reader"
+    check_prerequisites
+
+    # Unload if already running
+    if launchctl list 2>/dev/null | grep -q "$SERVICE_NAME"; then
+        warn "Service already loaded. Unloading first..."
+        launchctl unload "$PLIST_FILE" 2>/dev/null || true
+    fi
+
+    # Generate configs
+    generate_plist
+    generate_caddy_site
+
+    # Load service
+    info "Loading service..."
+    launchctl load "$PLIST_FILE"
+
+    # Reload Caddy
+    reload_caddy
+
+    sleep 2
+    echo ""
+    do_status
+}
+
+do_uninstall() {
+    header "Uninstalling OpenChessVision Book Reader"
+
+    if [[ -f "$PLIST_FILE" ]]; then
+        launchctl unload "$PLIST_FILE" 2>/dev/null || true
+        rm -f "$PLIST_FILE"
+        info "Removed LaunchAgent plist"
+    else
+        warn "Service plist not found"
+    fi
+
+    if [[ -f "$MY_CADDY_SITE" ]]; then
+        rm -f "$MY_CADDY_SITE"
+        info "Removed Caddy site config"
+        reload_caddy
+    fi
+
+    info "Uninstall complete."
+    info "Log files remain at: $LOG_DIR"
+}
+
+do_status() {
+    header "Service Status"
+
+    local svc_info
+    svc_info=$(launchctl list 2>/dev/null | grep "$SERVICE_NAME" || true)
+
+    if [[ -n "$svc_info" ]]; then
+        local pid=$(echo "$svc_info" | awk '{print $1}')
+        if [[ "$pid" != "-" && "$pid" =~ ^[0-9]+$ ]]; then
+            echo -e "  Server: ${GREEN}Running${NC} (PID: $pid)"
+        else
+            echo -e "  Server: ${YELLOW}Loaded but not running${NC}"
+        fi
+    else
+        echo -e "  Server: ${RED}Not installed${NC}"
+    fi
+
+    echo ""
+    header "Health Check"
+
+    if curl -s "http://localhost:${SERVER_PORT}/" 2>/dev/null | grep -q "reader"; then
+        echo -e "  API (localhost:${SERVER_PORT}): ${GREEN}Healthy${NC}"
+    else
+        echo -e "  API (localhost:${SERVER_PORT}): ${RED}Not responding${NC}"
+    fi
+
+    if curl -s "http://books.chess.localhost/" 2>/dev/null | grep -q "reader"; then
+        echo -e "  Caddy proxy: ${GREEN}Working${NC}"
+    else
+        echo -e "  Caddy proxy: ${YELLOW}Not working${NC} (is Caddy running?)"
+    fi
+
+    # Check Chessnut Move service status
+    local board_status
+    board_status=$(curl -s "http://localhost:${SERVER_PORT}/api/board/status" 2>/dev/null || echo "{}")
+
+    if echo "$board_status" | grep -q '"available":true'; then
+        if echo "$board_status" | grep -q '"connected":true'; then
+            echo -e "  Chessnut Move: ${GREEN}Connected${NC}"
+        else
+            echo -e "  Chessnut Move: ${YELLOW}Available, board not connected${NC}"
+        fi
+    else
+        echo -e "  Chessnut Move: ${YELLOW}Service not available${NC}"
+    fi
+
+    echo ""
+    header "URLs"
+    echo -e "  App:    ${GREEN}http://books.chess.localhost${NC}"
+    echo "  Direct: http://localhost:${SERVER_PORT}"
+
+    echo ""
+    header "Logs"
+    echo "  stdout: $LOG_DIR/reader.stdout.log"
+    echo "  stderr: $LOG_DIR/reader.stderr.log"
+}
+
+do_logs() {
+    local lines="${2:-50}"
+
+    header "Server Logs (last $lines lines)"
+
+    if [[ -f "$LOG_DIR/reader.stderr.log" ]]; then
+        tail -"$lines" "$LOG_DIR/reader.stderr.log"
+    else
+        echo "  (no logs yet)"
+    fi
+}
+
+do_restart() {
+    header "Restarting OpenChessVision Book Reader"
+
+    if [[ -f "$PLIST_FILE" ]]; then
+        launchctl unload "$PLIST_FILE" 2>/dev/null || true
+        sleep 1
+        launchctl load "$PLIST_FILE"
+        info "Service restarted"
+        sleep 2
+        do_status
+    else
+        error "Service not installed. Run: $0 install"
+        exit 1
+    fi
+}
+
+do_follow() {
+    header "Following logs (Ctrl+C to stop)"
+    tail -f "$LOG_DIR/reader.stderr.log" "$LOG_DIR/reader.stdout.log" 2>/dev/null || \
+        error "No log files found. Is the service installed?"
+}
+
+# Main
+case "${1:-help}" in
+    install)
+        do_install
+        ;;
+    uninstall|remove)
+        do_uninstall
+        ;;
+    status)
+        do_status
+        ;;
+    logs)
+        do_logs "$@"
+        ;;
+    follow)
+        do_follow
+        ;;
+    restart)
+        do_restart
+        ;;
+    *)
+        echo "OpenChessVision Book Reader Service Manager"
+        echo ""
+        echo "Usage: $0 <command>"
+        echo ""
+        echo "Commands:"
+        echo "  install    Install server as LaunchAgent + register with Caddy"
+        echo "  uninstall  Stop and remove LaunchAgent"
+        echo "  status     Show service status and health check"
+        echo "  restart    Restart the server"
+        echo "  logs [N]   Show last N lines of logs (default: 50)"
+        echo "  follow     Tail logs continuously"
+        echo ""
+        echo "The service will:"
+        echo "  - Start automatically on login"
+        echo "  - Restart if it crashes"
+        echo "  - Auto-sync recognized positions to Chessnut Move board"
+        echo "  - Register with shared Caddy at ~/Caddy"
+        echo ""
+        echo -e "URL: ${GREEN}http://books.chess.localhost${NC}"
+        echo ""
+        echo "Log files: $LOG_DIR/"
+        ;;
+esac
