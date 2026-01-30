@@ -1058,12 +1058,12 @@ function openReachModal(targetFen, startFen, baseAnalysisId, gameId) {
         turn: existingTurn || 'w', // Default to white if not specified
     };
 
+    // Initialize boards (destroy old ones first)
+    destroyReachBoards();
+
     // Build full FEN for chess.js (assume white to move, full castling)
     const fullStartFen = `${startFen} w KQkq - 0 1`;
     reachGame = new Chess(fullStartFen);
-
-    // Initialize boards
-    destroyReachBoards();
 
     reachStartBoardInstance = Chessboard('reach-start-board', {
         position: startFen,
