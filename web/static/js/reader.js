@@ -146,8 +146,6 @@ const els = {
     reachMoveList: document.getElementById('reach-move-list'),
     reachStatus: document.getElementById('reach-status'),
     reachIndicator: document.getElementById('reach-indicator'),
-    reachBtnManual: document.getElementById('reach-btn-manual'),
-    reachBtnOtb: document.getElementById('reach-btn-otb'),
     reachBtnUndo: document.getElementById('reach-btn-undo'),
     reachBtnReset: document.getElementById('reach-btn-reset'),
     reachBtnDone: document.getElementById('reach-btn-done'),
@@ -1099,19 +1097,21 @@ function openReachModal(targetFen, startFen, baseAnalysisId, gameId) {
     // Reset UI
     updateReachMoveList();
     updateReachIndicator();
-    els.reachBtnUndo.disabled = true;
-    els.reachBtnDone.disabled = true;
+    if (els.reachBtnUndo) els.reachBtnUndo.disabled = true;
+    if (els.reachBtnDone) els.reachBtnDone.disabled = true;
 
-    // Show modal first (so boards can render at correct size)
+    // Show modal
     els.reachModal.classList.remove('hidden');
 
-    // Resize boards after modal is visible, then set mode
+    // Resize boards after modal is visible
     setTimeout(() => {
         if (reachStartBoardInstance) reachStartBoardInstance.resize();
         if (reachEntryBoardInstance) reachEntryBoardInstance.resize();
         if (reachTargetBoardInstance) reachTargetBoardInstance.resize();
-        setReachMode('manual');
     }, 50);
+
+    // Start automatic board sync (opportunistic - no user action needed)
+    startReachBoardSync();
 
     status('Enter moves to reach the target position');
 }
@@ -1119,15 +1119,8 @@ function openReachModal(targetFen, startFen, baseAnalysisId, gameId) {
 function closeReachModal() {
     els.reachModal.classList.add('hidden');
     destroyReachBoards();
-
-    // Stop OTB monitoring if active
-    if (state.otbMonitorInterval) {
-        clearInterval(state.otbMonitorInterval);
-        state.otbMonitorInterval = null;
-    }
-
+    stopReachBoardSync();
     state.reachSession = null;
-    state.reachMode = null;
 }
 
 function destroyReachBoards() {
@@ -1146,39 +1139,19 @@ function destroyReachBoards() {
     reachGame = null;
 }
 
-function setReachMode(mode) {
-    state.reachMode = mode;
+// Automatic bidirectional board sync - no user mode selection needed
+let lastSyncedBoardFen = null;
 
-    // Update button states
-    els.reachBtnManual.classList.toggle('active', mode === 'manual');
-    els.reachBtnOtb.classList.toggle('active', mode === 'otb');
-
-    if (mode === 'otb') {
-        // Start OTB monitoring
-        startReachOtbMonitoring();
-        els.reachStatus.innerHTML = '<span class="reach-otb-status"><span class="pulse"></span> Waiting for board moves...</span>';
-    } else {
-        // Stop OTB monitoring if active
-        if (state.otbMonitorInterval) {
-            clearInterval(state.otbMonitorInterval);
-            state.otbMonitorInterval = null;
-        }
-        els.reachStatus.textContent = 'Make moves on the board above';
-    }
-}
-
-function startReachOtbMonitoring() {
-    if (state.otbMonitorInterval) {
-        clearInterval(state.otbMonitorInterval);
-    }
+function startReachBoardSync() {
+    stopReachBoardSync();
 
     // Sync physical board to current position
     if (reachGame) {
         syncToBoard(reachGame.fen().split(' ')[0]);
+        lastSyncedBoardFen = reachGame.fen().split(' ')[0];
     }
 
-    let lastBoardFen = null;
-
+    // Poll physical board for changes
     state.otbMonitorInterval = setInterval(async () => {
         try {
             const response = await fetch('/api/board/fen');
@@ -1186,19 +1159,25 @@ function startReachOtbMonitoring() {
             const data = await response.json();
             if (!data.fen) return;
 
-            const boardFen = data.fen.split(' ')[0]; // Piece placement only
-            if (boardFen === lastBoardFen) return;
-            lastBoardFen = boardFen;
+            const boardFen = data.fen.split(' ')[0];
+            if (boardFen === lastSyncedBoardFen) return;
 
-            // Try to find a legal move that leads to this position
-            handleReachOtbUpdate(boardFen);
+            // Physical board changed - try to match a legal move
+            handlePhysicalBoardUpdate(boardFen);
         } catch (e) {
-            // Ignore polling errors
+            // Ignore polling errors - board might not be connected
         }
     }, 500);
 }
 
-function handleReachOtbUpdate(newFen) {
+function stopReachBoardSync() {
+    if (state.otbMonitorInterval) {
+        clearInterval(state.otbMonitorInterval);
+        state.otbMonitorInterval = null;
+    }
+}
+
+function handlePhysicalBoardUpdate(newFen) {
     if (!reachGame || !state.reachSession) return;
 
     // Try all legal moves to see if any leads to newFen
@@ -1212,6 +1191,7 @@ function handleReachOtbUpdate(newFen) {
             // Found the move!
             reachGame.move(move);
             state.reachSession.moves.push(move.san);
+            lastSyncedBoardFen = newFen;
 
             // Update UI
             if (reachEntryBoardInstance) {
@@ -1220,13 +1200,12 @@ function handleReachOtbUpdate(newFen) {
             updateReachMoveList();
             updateReachIndicator();
 
-            els.reachBtnUndo.disabled = false;
+            if (els.reachBtnUndo) els.reachBtnUndo.disabled = false;
             return;
         }
     }
 
-    // No matching move found - user may have set up position manually on board
-    els.reachStatus.innerHTML = '<span class="reach-otb-status"><span class="pulse"></span> Waiting for valid move...</span>';
+    // No matching move found - ignore (board might be mid-move or reset)
 }
 
 // Move validation for manual entry
@@ -1259,13 +1238,18 @@ function onReachDrop(source, target) {
     // Record the move
     state.reachSession.moves.push(move.san);
 
+    // Sync to physical board
+    const newFen = reachGame.fen().split(' ')[0];
+    lastSyncedBoardFen = newFen;
+    syncToBoard(newFen);
+
     // Update UI
     updateReachMoveList();
     updateReachIndicator();
-    els.reachBtnUndo.disabled = false;
+    if (els.reachBtnUndo) els.reachBtnUndo.disabled = false;
 
     const turn = reachGame.turn() === 'w' ? 'White' : 'Black';
-    els.reachStatus.textContent = `${turn} to move`;
+    if (els.reachStatus) els.reachStatus.textContent = `${turn} to move`;
 }
 
 function onReachSnapEnd() {
@@ -1320,15 +1304,15 @@ function reachUndo() {
         reachEntryBoardInstance.position(reachGame.fen());
     }
 
+    // Sync to physical board
+    const newFen = reachGame.fen().split(' ')[0];
+    lastSyncedBoardFen = newFen;
+    syncToBoard(newFen);
+
     updateReachMoveList();
     updateReachIndicator();
 
-    els.reachBtnUndo.disabled = state.reachSession.moves.length === 0;
-
-    // Also sync to physical board if in OTB mode
-    if (state.reachMode === 'otb') {
-        syncToBoard(reachGame.fen().split(' ')[0]);
-    }
+    if (els.reachBtnUndo) els.reachBtnUndo.disabled = state.reachSession.moves.length === 0;
 }
 
 function reachReset() {
@@ -1344,14 +1328,13 @@ function reachReset() {
         reachEntryBoardInstance.position(startFen);
     }
 
+    // Sync to physical board
+    lastSyncedBoardFen = startFen;
+    syncToBoard(startFen);
+
     updateReachMoveList();
     updateReachIndicator();
-    els.reachBtnUndo.disabled = true;
-
-    // Sync to physical board if in OTB mode
-    if (state.reachMode === 'otb') {
-        syncToBoard(startFen);
-    }
+    if (els.reachBtnUndo) els.reachBtnUndo.disabled = true;
 
     status('Reset to starting position');
 }
@@ -1390,12 +1373,6 @@ function reachCancel() {
 function setupReachModalListeners() {
     if (els.reachModalClose) {
         els.reachModalClose.addEventListener('click', reachCancel);
-    }
-    if (els.reachBtnManual) {
-        els.reachBtnManual.addEventListener('click', () => setReachMode('manual'));
-    }
-    if (els.reachBtnOtb) {
-        els.reachBtnOtb.addEventListener('click', () => setReachMode('otb'));
     }
     if (els.reachBtnUndo) {
         els.reachBtnUndo.addEventListener('click', reachUndo);
