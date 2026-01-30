@@ -32,9 +32,11 @@ dependencies = [
     # BLE connectivity (for direct board control)
     "bleak>=0.22.0",
 
-    # Image processing (numpy/opencv/pillow come from nix, but we list for completeness)
+    # Image processing
     "numpy>=1.26.0",
     "pillow>=10.0.0",
+    "opencv-python-headless>=4.10.0",
+    "pytesseract>=0.3.10",
 
     # Local CNN chess recognition
     "chessimg2pos>=0.1.0",

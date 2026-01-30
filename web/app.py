@@ -13,18 +13,71 @@ import shutil
 import uuid
 import tempfile
 import hashlib
+import subprocess
 from pathlib import Path
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 
 # Add project src to path for openchessvision imports
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+
+def get_build_info() -> dict:
+    """Get git commit hash and dirty status for build identification."""
+    try:
+        # Get short commit hash
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+        commit_hash = commit.stdout.strip() if commit.returncode == 0 else "unknown"
+
+        # Check if working directory is dirty
+        dirty_check = subprocess.run(
+            ["git", "diff", "--quiet"],
+            capture_output=True,
+            cwd=PROJECT_ROOT,
+        )
+        is_dirty = dirty_check.returncode != 0
+
+        # If dirty, get a hash of the changes
+        dirty_hash = ""
+        if is_dirty:
+            diff_hash = subprocess.run(
+                ["sh", "-c", "git diff | git hash-object --stdin"],
+                capture_output=True,
+                text=True,
+                cwd=PROJECT_ROOT,
+            )
+            if diff_hash.returncode == 0:
+                dirty_hash = f"-dirty-{diff_hash.stdout.strip()[:8]}"
+            else:
+                dirty_hash = "-dirty"
+
+        version = f"{commit_hash}{dirty_hash}"
+        return {
+            "version": version,
+            "commit": commit_hash,
+            "dirty": is_dirty,
+            "dirty_hash": dirty_hash.replace("-dirty-", "") if dirty_hash else None,
+        }
+    except Exception as e:
+        return {"version": "unknown", "commit": "unknown", "dirty": False, "error": str(e)}
+
+
+# Cache build info at startup
+BUILD_INFO = get_build_info()
 
 from flask import Flask, jsonify, request, send_file, render_template, redirect, url_for
 from flask_cors import CORS
 import chess
 import cv2
 import numpy as np
+from PIL import Image
+import pytesseract
 
 # Paths
 PENDING_DIR = PROJECT_ROOT / "tests" / "fixtures" / "pending"
@@ -80,7 +133,24 @@ def index():
 @app.route("/reader")
 def reader():
     """Serve the chess book reader UI."""
-    return render_template("reader.html")
+    return render_template("reader.html", build_info=BUILD_INFO)
+
+
+@app.route("/api/build-info")
+def build_info():
+    """Return build/version information."""
+    return jsonify(BUILD_INFO)
+
+
+@app.route("/api/js-error", methods=["POST"])
+def js_error():
+    """Log JavaScript errors from the frontend for debugging."""
+    data = request.get_json(silent=True) or {}
+    print(f"[JS ERROR] {data.get('message', 'Unknown error')}")
+    print(f"           Source: {data.get('source', '?')}:{data.get('line', '?')}:{data.get('column', '?')}")
+    if data.get('stack'):
+        print(f"           Stack: {data.get('stack')[:500]}")
+    return jsonify({"ok": True})
 
 
 @app.route("/debug")
@@ -457,6 +527,118 @@ def recognize_region():
 
 
 # =============================================================================
+# Move Text Extraction (PDF text + OCR)
+# =============================================================================
+
+
+@app.route("/api/extract-moves", methods=["POST"])
+def extract_moves():
+    """
+    Extract move text from a PDF region using both PDF text extraction and OCR.
+    Expects JSON: {pdf_id, page, bbox: {x, y, width, height}}
+    Returns: {pdf_text, ocr_text}
+    """
+    import json
+    import time
+    import fitz
+
+    data = request.get_json()
+    pdf_id = data.get("pdf_id")
+    page = data.get("page")
+    bbox = data.get("bbox")
+
+    if not all([pdf_id, page is not None, bbox]):
+        return jsonify({"error": "Missing pdf_id, page, or bbox"}), 400
+
+    pdf_path = UPLOADS_DIR / f"{pdf_id}.pdf"
+    if not pdf_path.exists():
+        return jsonify({"error": "PDF not found"}), 404
+
+    x, y, w, h = bbox["x"], bbox["y"], bbox["width"], bbox["height"]
+
+    def extract_pdf_text() -> str:
+        with fitz.open(str(pdf_path)) as doc:
+            rect = fitz.Rect(x, y, x + w, y + h)
+            return doc[page].get_text("text", clip=rect) or ""
+
+    def extract_ocr_text() -> str:
+        with fitz.open(str(pdf_path)) as doc:
+            mat = fitz.Matrix(2.0, 2.0)
+            pix = doc[page].get_pixmap(matrix=mat)
+            img_data = np.frombuffer(pix.samples, dtype=np.uint8)
+            img = img_data.reshape(pix.height, pix.width, pix.n)
+
+            if pix.n == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+            elif pix.n == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+            region = img[y : y + h, x : x + w]
+            if region.size == 0:
+                return ""
+
+            rgb = cv2.cvtColor(region, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(rgb)
+            return pytesseract.image_to_string(pil_img, config="--psm 6")
+
+    # #region agent log
+    try:
+        with open(PROJECT_ROOT / ".cursor" / "debug.log", "a", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "location": "app.py:extract_moves:entry",
+                        "message": "Extract moves entry",
+                        "data": {"pdf_id": pdf_id, "page": page, "bbox": bbox},
+                        "timestamp": int(time.time() * 1000),
+                        "sessionId": "debug-session",
+                        "hypothesisId": "H10",
+                    }
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+    # #endregion
+
+    start_time = time.time()
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_pdf = executor.submit(extract_pdf_text)
+            future_ocr = executor.submit(extract_ocr_text)
+            pdf_text = future_pdf.result()
+            ocr_text = future_ocr.result()
+
+        # #region agent log
+        try:
+            with open(PROJECT_ROOT / ".cursor" / "debug.log", "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "location": "app.py:extract_moves:done",
+                            "message": "Extract moves done",
+                            "data": {
+                                "pdf_text_len": len(pdf_text or ""),
+                                "ocr_text_len": len(ocr_text or ""),
+                                "elapsed_ms": int((time.time() - start_time) * 1000),
+                            },
+                            "timestamp": int(time.time() * 1000),
+                            "sessionId": "debug-session",
+                            "hypothesisId": "H10",
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+
+        return jsonify({"pdf_text": pdf_text, "ocr_text": ocr_text})
+    except Exception as e:
+        return jsonify({"error": f"Extraction failed: {e}"}), 500
+
+
+# =============================================================================
 # Study Persistence APIs
 # =============================================================================
 
@@ -744,6 +926,28 @@ def board_status():
 
     except Exception as e:
         return jsonify({"available": False, "error": str(e)})
+
+
+@app.route("/api/board/fen")
+def board_fen():
+    """
+    Get the current board FEN from the Chessnut Move service.
+    Returns: {fen: string} or {error: string}
+    """
+    try:
+        from openchessvision.integrations.chessnut_service import get_config
+        import urllib.request
+        import json as json_module
+
+        config = get_config()
+        url = f"{config.base_url}/api/state/fen"
+
+        with urllib.request.urlopen(url, timeout=config.timeout) as response:
+            data = json_module.loads(response.read().decode("utf-8"))
+            return jsonify({"fen": data.get("fen")})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

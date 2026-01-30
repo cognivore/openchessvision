@@ -38,7 +38,7 @@
                     <div class="piece-palette" id="piece-palette-black"></div>
                 </section>
                 <section class="detected-section">
-                    <h3>Detected Positions</h3>
+                    <h3>Detected Games</h3>
                     <div class="position-list" id="position-list"></div>
                 </section>
             </aside>
@@ -63,6 +63,7 @@
                         <!-- Board overlay (when position is active) -->
                         <div id="board-overlay" class="board-overlay hidden">
                             <div id="active-board"></div>
+                            <div id="text-overlay" class="text-overlay hidden"></div>
                         </div>
                     </div>
 
@@ -83,7 +84,55 @@
                     <h3>Analysis</h3>
                     <div id="analysis-container" class="analysis-container">
                         <div class="no-analysis">
-                            <p>Select a position to analyze</p>
+                            <p>Select a game to analyze</p>
+                        </div>
+                        <div id="workflow-panel" class="workflow-panel">
+                            <div id="confirm-panel" class="workflow-card hidden">
+                                <div class="workflow-title">1) Confirm Pieces</div>
+                                <div class="workflow-text">Does this position look correct?</div>
+                                <div class="workflow-actions">
+                                    <button id="btn-confirm-pieces" class="btn-primary btn-small">Looks Correct</button>
+                                    <button id="btn-edit-pieces" class="btn-secondary btn-small">Edit Pieces</button>
+                                </div>
+                            </div>
+                            <div id="game-match-panel" class="workflow-card hidden">
+                                <div class="workflow-title">Existing Games Found</div>
+                                <div class="workflow-text">Continue from the main line of an existing game?</div>
+                                <div id="game-match-list" class="game-match-list"></div>
+                                <div class="workflow-actions">
+                                    <button id="btn-continue-game" class="btn-primary btn-small">Continue Main Line</button>
+                                    <button id="btn-new-game" class="btn-secondary btn-small">Start New Game</button>
+                                </div>
+                            </div>
+                            <div id="reach-panel" class="workflow-card hidden">
+                                <div class="workflow-title">2) Reach This Position</div>
+                                <div class="workflow-text">How do you want to reach this position?</div>
+                                <div class="workflow-actions">
+                                    <button id="btn-reach-otb" class="btn-primary btn-small">Play OTB</button>
+                                    <button id="btn-reach-ocr" class="btn-secondary btn-small">Extract from Text</button>
+                                </div>
+                            </div>
+                            <div id="otb-panel" class="workflow-card hidden">
+                                <div class="workflow-title">OTB Monitoring</div>
+                                <div class="workflow-text" id="otb-status">Waiting for board...</div>
+                                <button id="btn-stop-otb" class="btn-secondary btn-small">Stop</button>
+                            </div>
+                            <div id="ocr-panel" class="workflow-card hidden">
+                                <div class="workflow-title">OCR / Text Extraction</div>
+                                <div class="workflow-text">Draw a box around the move text on the PDF.</div>
+                                <button id="btn-start-text-select" class="btn-primary btn-small">Select Text Region</button>
+                                <div id="ocr-status" class="workflow-text small"></div>
+                            </div>
+                        </div>
+                        <div id="continuation-prompt" class="continuation-prompt hidden">
+                            <div class="continuation-header">Continue from previous?</div>
+                            <div class="continuation-info" id="continuation-info">
+                                <!-- Filled by JS: "Page X → 3 moves" -->
+                            </div>
+                            <div class="continuation-actions">
+                                <button id="btn-accept-continuation" class="btn-primary btn-small">Continue</button>
+                                <button id="btn-dismiss-continuation" class="btn-secondary btn-small">New Analysis</button>
+                            </div>
                         </div>
                         <div id="pgn-viewer" class="pgn-viewer hidden"></div>
                         <div id="engine-panel" class="engine-panel hidden">
@@ -101,12 +150,87 @@
                         <button id="btn-copy-fen" class="btn-secondary" disabled>📋 FEN</button>
                         <button id="btn-copy-pgn" class="btn-secondary" disabled>📋 PGN</button>
                     </div>
+                    <button id="btn-select-text" class="btn-secondary btn-small btn-set-opening" disabled>📰 Select Text</button>
+                    <!-- Opening moves input -->
+                    <div id="opening-input-panel" class="opening-input-panel hidden">
+                        <label for="opening-moves-input">Set opening moves (e.g. "1. d4 Nf6 2. c4 c5"):</label>
+                        <textarea id="opening-moves-input" class="opening-moves-input" placeholder="1. d4 Nf6 2. c4 c5 3. d5 e6" rows="2"></textarea>
+                        <div class="opening-input-actions">
+                            <button id="btn-apply-opening" class="btn-primary btn-small">Apply Moves</button>
+                            <button id="btn-cancel-opening" class="btn-secondary btn-small">Cancel</button>
+                        </div>
+                    </div>
+                    <button id="btn-set-opening" class="btn-secondary btn-small btn-set-opening" disabled>📝 Set Opening Moves</button>
                 </section>
             </aside>
         </main>
 
         <!-- Status bar -->
-        <footer class="status-bar" id="status-bar">Ready - Open a PDF to begin</footer>
+        <footer class="status-bar">
+            <span id="status-bar">Ready - Open a PDF to begin</span>
+            <span class="status-bar-right">
+                <span id="board-status" class="board-status offline" title="Chessnut Move board">
+                    <span class="board-status-dot"></span>
+                    <span class="board-status-text">Board offline</span>
+                </span>
+                <span class="build-info" title="Build: {{ build_info.version }}">{{ build_info.version }}</span>
+            </span>
+        </footer>
+
+        <!-- Reach Position Modal (page-switch resilient) -->
+        <div id="reach-modal" class="reach-modal hidden">
+            <div class="reach-modal-backdrop"></div>
+            <div class="reach-modal-content">
+                <div class="reach-modal-header">
+                    <h2>Reach Position</h2>
+                    <button class="reach-modal-close" id="reach-modal-close">×</button>
+                </div>
+
+                <div class="reach-modal-body">
+                    <!-- Three-column layout: Start → Entry → Target -->
+                    <div class="reach-columns">
+                        <!-- Starting position -->
+                        <div class="reach-column reach-start">
+                            <h3>From</h3>
+                            <div id="reach-start-board" class="reach-board"></div>
+                            <div class="reach-label" id="reach-start-label">Starting position</div>
+                        </div>
+
+                        <!-- Move entry area -->
+                        <div class="reach-column reach-entry">
+                            <h3>Enter Moves</h3>
+                            <div id="reach-entry-board" class="reach-board reach-board-main"></div>
+                            <div class="reach-move-list" id="reach-move-list">
+                                <em>Make moves on the board above</em>
+                            </div>
+                            <div class="reach-status" id="reach-status"></div>
+                        </div>
+
+                        <!-- Target position -->
+                        <div class="reach-column reach-target">
+                            <h3>Target</h3>
+                            <div id="reach-target-board" class="reach-board"></div>
+                            <div class="reach-indicator" id="reach-indicator">
+                                <span class="reach-not-reached">Not yet reached</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reach-modal-footer">
+                    <div class="reach-mode-buttons">
+                        <button id="reach-btn-manual" class="btn-primary">On Screen</button>
+                        <button id="reach-btn-otb" class="btn-secondary">Sync Physical Board</button>
+                    </div>
+                    <div class="reach-action-buttons">
+                        <button id="reach-btn-undo" class="btn-secondary" disabled>↩ Undo</button>
+                        <button id="reach-btn-reset" class="btn-secondary">↺ Reset</button>
+                        <button id="reach-btn-done" class="btn-primary" disabled>✓ Done</button>
+                        <button id="reach-btn-cancel" class="btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- jQuery (vendored, required by chessboard.js) -->
@@ -119,7 +243,7 @@
     <script src="/static/vendor/js/chess.min.js"></script>
 
     <!-- App logic -->
-    <script src="/static/js/reader.js"></script>
+    <script src="/static/js/reader.js?v={{ build_info.version if build_info else 'dev' }}"></script>
 
     {% if debug_mode %}
     <script>

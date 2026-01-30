@@ -17,6 +17,7 @@
     --accent-copper: #c87941;
     --accent-green: #39ff14;
     --accent-purple: #bf00ff;
+    --accent-red: #ff4444;
 
     /* Fonts */
     --font-mono: 'Space Mono', monospace;
@@ -273,6 +274,33 @@ button:disabled {
     text-overflow: ellipsis;
 }
 
+.btn-delete-position {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    margin-left: 4px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.position-item:hover .btn-delete-position {
+    opacity: 1;
+}
+
+.btn-delete-position:hover {
+    background: var(--accent-red, #ff4444);
+    border-color: var(--accent-red, #ff4444);
+    color: white;
+}
+
 /* Viewer Container */
 .viewer-container {
     flex: 1;
@@ -355,6 +383,29 @@ button:disabled {
     pointer-events: none;
 }
 
+.text-overlay {
+    position: absolute;
+    inset: 0;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    overflow: auto;
+    pointer-events: none;
+    white-space: pre-wrap;
+}
+
+.text-overlay.hidden {
+    display: none;
+}
+
+.text-select-box {
+    stroke: var(--accent-purple);
+    stroke-width: 2;
+    fill: rgba(191, 0, 255, 0.1);
+}
+
 .detection-overlay .detection-box {
     pointer-events: auto;
     cursor: pointer;
@@ -394,7 +445,28 @@ button:disabled {
 }
 
 .board-overlay.transparent {
-    opacity: 0.85;
+    /* Fully transparent background so user can see PDF diagram underneath */
+    opacity: 1;
+    background: transparent !important;
+}
+
+/* AGGRESSIVELY make chessboard.js squares transparent in verification mode */
+.board-overlay.transparent .board-b72b1,
+.board-overlay.transparent .square-55d63,
+.board-overlay.transparent .white-1e1d7,
+.board-overlay.transparent .black-3c85d,
+.board-overlay.transparent [class*="board-"],
+.board-overlay.transparent [class*="square-"],
+.board-overlay.transparent [class*="white-"],
+.board-overlay.transparent [class*="black-"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Pieces remain fully visible with glow effects */
+.board-overlay.transparent img {
+    opacity: 1 !important;
 }
 
 .board-overlay.solid {
@@ -451,8 +523,196 @@ button:disabled {
     font-size: 0.85rem;
 }
 
+/* Continuation Prompt */
+.continuation-prompt {
+    background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(57, 255, 20, 0.08) 100%);
+    border: 1px solid var(--accent-green);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.continuation-prompt.hidden {
+    display: none;
+}
+
+.continuation-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    margin-bottom: 0.5rem;
+}
+
+.continuation-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.continuation-info .moves-preview {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    margin-top: 0.25rem;
+    display: block;
+    font-size: 0.75rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.continuation-info .hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.continuation-info code {
+    font-family: var(--font-mono);
+    background: var(--bg-primary);
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+/* Opening moves input panel */
+.opening-input-panel {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.opening-input-panel.hidden {
+    display: none;
+}
+
+.opening-input-panel label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.opening-moves-input {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    resize: vertical;
+    min-height: 50px;
+}
+
+.opening-moves-input:focus {
+    outline: none;
+    border-color: var(--accent-green);
+}
+
+.opening-input-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.opening-input-actions button {
+    flex: 1;
+}
+
+.btn-set-opening {
+    width: 100%;
+    margin-top: 0.75rem;
+}
+
+.btn-set-opening:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.continuation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.continuation-actions button {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+}
+
 .pgn-viewer {
     height: 100%;
+}
+
+/* Workflow panels */
+.workflow-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.workflow-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.workflow-card.hidden {
+    display: none;
+}
+
+.workflow-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-gold);
+    margin-bottom: 0.5rem;
+}
+
+.workflow-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.workflow-text.small {
+    font-size: 0.75rem;
+}
+
+.workflow-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.game-match-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.game-match-item {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.game-match-item.selected {
+    border-color: var(--accent-green);
+    background: rgba(57, 255, 20, 0.08);
+    color: var(--text-primary);
 }
 
 /* Engine Panel */
@@ -581,11 +841,78 @@ button:disabled {
 
 /* Status Bar */
 .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 0.5rem 1rem;
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     font-size: 0.8rem;
     color: var(--text-secondary);
+}
+
+.status-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.board-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.board-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.board-status.offline {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.board-status.offline .board-status-dot {
+    background: var(--text-secondary);
+}
+
+.board-status.online {
+    color: var(--accent-copper);
+}
+
+.board-status.online .board-status-dot {
+    background: var(--accent-copper);
+    box-shadow: 0 0 4px var(--accent-copper);
+}
+
+.board-status.connected {
+    color: var(--accent-gold);
+}
+
+.board-status.connected .board-status-dot {
+    background: var(--accent-gold);
+    box-shadow: 0 0 6px var(--accent-gold);
+    animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.build-info {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    cursor: help;
 }
 
 /* lichess-pgn-viewer overrides */
@@ -618,4 +945,201 @@ button:disabled {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
+}
+
+/* =============================================================================
+   Reach Position Modal
+   ============================================================================= */
+
+.reach-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reach-modal.hidden {
+    display: none !important;
+}
+
+.reach-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+}
+
+.reach-modal-content {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-width: 900px;
+    width: 95vw;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.reach-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.reach-modal-header h2 {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.reach-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+}
+
+.reach-modal-close:hover {
+    color: var(--accent-red);
+}
+
+.reach-modal-body {
+    padding: 1.5rem;
+}
+
+.reach-columns {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.reach-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.reach-column h3 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.reach-board {
+    width: 180px;
+    height: 180px;
+}
+
+.reach-board-main {
+    width: 280px;
+    height: 280px;
+}
+
+.reach-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.reach-move-list {
+    width: 100%;
+    max-height: 80px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.reach-move-list em {
+    color: var(--text-secondary);
+}
+
+.reach-status {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    min-height: 1.5em;
+}
+
+.reach-indicator {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.reach-not-reached {
+    color: var(--text-secondary);
+}
+
+.reach-reached {
+    color: var(--accent-green);
+    background: rgba(57, 255, 20, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    animation: pulse-green 1.5s infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(57, 255, 20, 0); }
+}
+
+.reach-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+.reach-mode-buttons,
+.reach-action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.reach-mode-buttons button.active {
+    background: var(--accent-gold);
+    color: var(--bg-primary);
+    border-color: var(--accent-gold);
+}
+
+/* OTB status in modal */
+.reach-otb-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.reach-otb-status .pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }

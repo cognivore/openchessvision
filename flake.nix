@@ -21,6 +21,7 @@
           numpy
           opencv4
           pillow
+          pytesseract
 
           # Development tools
           ipython
@@ -33,6 +34,9 @@
           buildInputs = with pkgs; [
             # Python environment
             pythonEnv
+
+          # OCR engine
+          tesseract
 
             # Qt6 for PyQt6 (qtwayland is Linux-only, not needed on macOS)
             qt6.qtbase
