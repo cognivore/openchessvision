@@ -130,6 +130,12 @@ def index():
     return redirect(url_for("reader"))
 
 
+@app.route("/favicon.ico")
+def favicon():
+    """Serve favicon."""
+    return send_file(Path(__file__).parent / "static" / "favicon.ico", mimetype="image/x-icon")
+
+
 @app.route("/reader")
 def reader():
     """Serve the chess book reader UI."""
@@ -407,6 +413,66 @@ def detect_diagrams(pdf_id: str, page: int):
         return jsonify({"error": f"Detection failed: {e}"}), 500
 
 
+def compute_iou(box1: dict, box2: dict) -> float:
+    """Compute Intersection over Union between two boxes."""
+    x1 = max(box1["x"], box2["x"])
+    y1 = max(box1["y"], box2["y"])
+    x2 = min(box1["x"] + box1["width"], box2["x"] + box2["width"])
+    y2 = min(box1["y"] + box1["height"], box2["y"] + box2["height"])
+
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+
+    intersection = (x2 - x1) * (y2 - y1)
+    area1 = box1["width"] * box1["height"]
+    area2 = box2["width"] * box2["height"]
+    union = area1 + area2 - intersection
+
+    return intersection / union if union > 0 else 0.0
+
+
+def non_maximum_suppression(boxes: list, iou_threshold: float = 0.5) -> list:
+    """
+    Remove overlapping boxes, keeping the one with higher confidence.
+    Also removes boxes that are mostly contained within larger boxes.
+    """
+    if not boxes:
+        return []
+
+    # Sort by confidence (higher first)
+    sorted_boxes = sorted(boxes, key=lambda b: b["confidence"], reverse=True)
+    keep = []
+
+    while sorted_boxes:
+        best = sorted_boxes.pop(0)
+        keep.append(best)
+
+        # Filter out boxes that overlap too much with the best box
+        remaining = []
+        for box in sorted_boxes:
+            iou = compute_iou(best, box)
+            # Also check if one box contains most of the other
+            intersection_x1 = max(best["x"], box["x"])
+            intersection_y1 = max(best["y"], box["y"])
+            intersection_x2 = min(best["x"] + best["width"], box["x"] + box["width"])
+            intersection_y2 = min(best["y"] + best["height"], box["y"] + box["height"])
+
+            if intersection_x2 > intersection_x1 and intersection_y2 > intersection_y1:
+                intersection_area = (intersection_x2 - intersection_x1) * (intersection_y2 - intersection_y1)
+                smaller_area = min(best["width"] * best["height"], box["width"] * box["height"])
+                containment_ratio = intersection_area / smaller_area if smaller_area > 0 else 0
+            else:
+                containment_ratio = 0
+
+            # Keep if IoU is low AND not mostly contained
+            if iou < iou_threshold and containment_ratio < 0.8:
+                remaining.append(box)
+
+        sorted_boxes = remaining
+
+    return keep
+
+
 def detect_squares_in_image(img: np.ndarray) -> list:
     """
     Detect square-ish regions that might be chess diagrams.
@@ -443,6 +509,9 @@ def detect_squares_in_image(img: np.ndarray) -> list:
                     "confidence": round(confidence, 2),
                 }
             )
+
+    # Apply non-maximum suppression to remove overlapping boxes
+    diagrams = non_maximum_suppression(diagrams, iou_threshold=0.3)
 
     # Sort by area (largest first) and limit
     diagrams.sort(key=lambda d: d["width"] * d["height"], reverse=True)

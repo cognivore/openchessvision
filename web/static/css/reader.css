@@ -19,9 +19,9 @@
     --accent-purple: #bf00ff;
     --accent-red: #ff4444;
 
-    /* Fonts */
-    --font-mono: 'Space Mono', monospace;
-    --font-serif: 'Crimson Pro', Georgia, serif;
+    /* Fonts - with system fallbacks */
+    --font-mono: 'Space Mono', 'SF Mono', Monaco, Consolas, monospace;
+    --font-serif: 'Crimson Pro', Georgia, 'Times New Roman', serif;
 
     /* Detection colors */
     --detection-stroke: #39ff14;
@@ -349,6 +349,8 @@ button:disabled {
 .pdf-page-container {
     position: relative;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #pdf-canvas {
@@ -378,9 +380,9 @@ button:disabled {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
+    /* width/height set by JS */
+    pointer-events: none;  /* SVG itself doesn't capture - let children handle */
+    z-index: 10;  /* Above canvas but below board overlay */
 }
 
 .text-overlay {
@@ -413,6 +415,8 @@ button:disabled {
     stroke: var(--detection-stroke);
     stroke-width: 2;
     transition: all 0.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .detection-overlay .detection-box:hover {
@@ -426,9 +430,38 @@ button:disabled {
     fill: rgba(212, 168, 67, 0.15);
 }
 
+.detection-overlay .detection-box.loading {
+    stroke: var(--accent-gold);
+    stroke-width: 3;
+    stroke-dasharray: 8 4;
+    animation: dash 0.5s linear infinite;
+    fill: rgba(212, 168, 67, 0.25);
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -12;
+    }
+}
+
+@keyframes spin {
+    from { transform-origin: center; transform: rotate(0deg); }
+    to { transform-origin: center; transform: rotate(360deg); }
+}
+
+.detection-overlay .loading-spinner {
+    fill: none;
+    stroke: var(--accent-gold);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 60 100;
+    animation: spin 1s linear infinite;
+    pointer-events: none;
+}
+
 /* Resizable handles for bboxes */
 .detection-overlay .resize-handle {
-    pointer-events: auto;
+    pointer-events: all;
     fill: var(--accent-gold);
     cursor: nwse-resize;
 }
@@ -437,11 +470,40 @@ button:disabled {
 .board-overlay {
     position: absolute;
     pointer-events: auto;
-    z-index: 10;
+    z-index: 20;  /* Above detection overlay so piece editing works */
 }
 
 .board-overlay.hidden {
     display: none;
+}
+
+.btn-close-board {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-primary);
+    border: 2px solid var(--accent-gold);
+    color: var(--accent-gold);
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.15s ease;
+    pointer-events: auto;
+}
+
+.btn-close-board:hover {
+    background: var(--accent-gold);
+    color: var(--bg-primary);
+    transform: scale(1.1);
 }
 
 .board-overlay.transparent {

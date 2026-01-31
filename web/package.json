@@ -1,0 +1,12 @@
+{
+  "name": "openchessvision-web",
+  "private": true,
+  "scripts": {
+    "build:reader": "esbuild static/ts/main.ts --bundle --format=iife --outfile=static/js/reader.bundle.js --sourcemap --target=es2020",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  }
+}

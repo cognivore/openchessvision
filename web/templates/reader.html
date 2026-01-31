@@ -62,6 +62,7 @@
                         <svg id="detection-overlay" class="detection-overlay"></svg>
                         <!-- Board overlay (when position is active) -->
                         <div id="board-overlay" class="board-overlay hidden">
+                            <button id="btn-close-board" class="btn-close-board" title="Close (Esc)">×</button>
                             <div id="active-board"></div>
                             <div id="text-overlay" class="text-overlay hidden"></div>
                         </div>
@@ -239,7 +240,7 @@
     <script src="/static/vendor/js/chess.min.js"></script>
 
     <!-- App logic -->
-    <script src="/static/js/reader.js?v={{ build_info.version if build_info else 'dev' }}"></script>
+    <script src="/static/js/reader.bundle.js?v={{ build_info.version if build_info else 'dev' }}"></script>
 
     {% if debug_mode %}
     <script>
