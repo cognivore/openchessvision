@@ -26,6 +26,7 @@ export type Cmd =
   | { tag: "BOARD_STATUS_POLL_STOP" }
   | { tag: "CLIPBOARD_WRITE"; text: string }
   | { tag: "CHESSBOARD_FLIP"; orientation: "white" | "black" }
+  | { tag: "CHESSNUT_SET_ORIENTATION"; orientation: "white" | "black" }
   | { tag: "CHESSBOARD_READ_PREVIEW" }
   | { tag: "SCHEDULE_SAVE"; delayMs: number }
   | { tag: "NO_OP" }

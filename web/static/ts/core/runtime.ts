@@ -632,6 +632,14 @@ export const createRuntime = (initial: Model) => {
         resources.boardRow.before?.orientation(cmd.orientation);
         resources.boardRow.after?.orientation(cmd.orientation);
         return;
+      case "CHESSNUT_SET_ORIENTATION":
+        // Sync orientation to Chessnut Move service (fire and forget)
+        fetch("/api/board/orientation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orientation: cmd.orientation }),
+        }).catch((err) => console.warn("[CHESSNUT] orientation sync failed:", err));
+        return;
       case "CHESSBOARD_READ_PREVIEW":
         // Read from board row's now board (used for piece editing confirmation)
         if (resources.boardRow.now) {

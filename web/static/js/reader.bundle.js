@@ -1272,7 +1272,10 @@
             ...model,
             ui: { ...model.ui, boardOrientation: msg.orientation }
           },
-          [{ tag: "CHESSBOARD_FLIP", orientation: msg.orientation }]
+          [
+            { tag: "CHESSBOARD_FLIP", orientation: msg.orientation },
+            { tag: "CHESSNUT_SET_ORIENTATION", orientation: msg.orientation }
+          ]
         ];
       case "OpeningsInputShown":
         return [
@@ -3373,6 +3376,13 @@
           resources.boardRow.now?.orientation(cmd.orientation);
           resources.boardRow.before?.orientation(cmd.orientation);
           resources.boardRow.after?.orientation(cmd.orientation);
+          return;
+        case "CHESSNUT_SET_ORIENTATION":
+          fetch("/api/board/orientation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orientation: cmd.orientation })
+          }).catch((err2) => console.warn("[CHESSNUT] orientation sync failed:", err2));
           return;
         case "CHESSBOARD_READ_PREVIEW":
           if (resources.boardRow.now) {

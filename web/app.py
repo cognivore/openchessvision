@@ -1019,6 +1019,43 @@ def board_fen():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/board/orientation", methods=["POST"])
+def board_orientation():
+    """
+    Set the board orientation on the Chessnut Move service.
+
+    Expects JSON: {orientation: "white" | "black"}
+    Returns: {success: boolean, error?: string, orientation?: string}
+
+    This syncs the orientation to the board service so LEDs/display
+    can show coordinates from the correct perspective.
+    """
+    data = request.get_json()
+
+    orientation = data.get("orientation")
+    if orientation not in ("white", "black"):
+        return jsonify({"success": False, "error": "orientation must be 'white' or 'black'"}), 400
+
+    try:
+        from openchessvision.integrations.chessnut_service import sync_orientation
+
+        result = sync_orientation(orientation)
+
+        if result.success:
+            return jsonify({
+                "success": True,
+                "orientation": result.orientation,
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.error,
+            })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     print(f"Pending images: {len(list(PENDING_DIR.glob('*.png')))}", flush=True)
     print(f"Starting annotation server at http://localhost:5050", flush=True)

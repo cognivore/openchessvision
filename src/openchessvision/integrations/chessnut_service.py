@@ -41,6 +41,15 @@ class ChessnutSyncResult:
     driver_synced: bool | None = None
 
 
+@dataclass(frozen=True)
+class ChessnutOrientationResult:
+    """Result of an orientation change operation."""
+
+    success: bool
+    error: str | None = None
+    orientation: str | None = None
+
+
 def get_config(env: dict[str, str] | None = None) -> ChessnutServiceConfig:
     """
     Load configuration from environment variables.
@@ -130,3 +139,59 @@ def sync_fen(
 
     except Exception as e:
         return ChessnutSyncResult(synced=False, error=str(e))
+
+
+def sync_orientation(
+    orientation: str,
+    config: ChessnutServiceConfig | None = None,
+) -> ChessnutOrientationResult:
+    """
+    Sync board orientation to the Chessnut Move service.
+
+    Args:
+        orientation: "white" or "black" - which side is at the bottom
+        config: Service configuration (loads from env if None)
+
+    Returns:
+        ChessnutOrientationResult indicating success or failure
+    """
+    if config is None:
+        config = get_config()
+
+    if orientation not in ("white", "black"):
+        return ChessnutOrientationResult(
+            success=False,
+            error=f"Invalid orientation: {orientation}. Must be 'white' or 'black'",
+        )
+
+    url = f"{config.base_url}/api/state/orientation"
+    payload = {"orientation": orientation}
+
+    try:
+        response = _post_json(url, payload, config.timeout)
+
+        return ChessnutOrientationResult(
+            success=True,
+            error=None,
+            orientation=response.get("orientation"),
+        )
+
+    except HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+            detail = body.get("detail", str(e))
+        except Exception:
+            detail = str(e)
+        return ChessnutOrientationResult(success=False, error=f"HTTP {e.code}: {detail}")
+
+    except URLError as e:
+        return ChessnutOrientationResult(success=False, error=f"Connection error: {e.reason}")
+
+    except json.JSONDecodeError as e:
+        return ChessnutOrientationResult(success=False, error=f"Invalid response: {e}")
+
+    except TimeoutError:
+        return ChessnutOrientationResult(success=False, error="Request timeout")
+
+    except Exception as e:
+        return ChessnutOrientationResult(success=False, error=str(e))

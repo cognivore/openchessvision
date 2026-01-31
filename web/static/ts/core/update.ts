@@ -1024,7 +1024,10 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
           ...model,
           ui: { ...model.ui, boardOrientation: msg.orientation },
         },
-        [{ tag: "CHESSBOARD_FLIP", orientation: msg.orientation }],
+        [
+          { tag: "CHESSBOARD_FLIP", orientation: msg.orientation },
+          { tag: "CHESSNUT_SET_ORIENTATION", orientation: msg.orientation },
+        ],
       ];
     case "OpeningsInputShown":
       return [
