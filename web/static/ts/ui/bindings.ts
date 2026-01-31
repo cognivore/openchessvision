@@ -149,20 +149,12 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
     els.btnRowDone.addEventListener("click", () => dispatch({ tag: "ReachDone" }));
     els.btnRowCancel.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
 
-    // Board row bindings - Analysis mode
+    // Board row bindings - Analysis mode (flip board orientation)
     els.btnRowAnalyseWhite.addEventListener("click", () => {
-        const model = getModel();
-        const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
-        if (active) {
-            dispatch({ tag: "AnalysisStarted", gameId: active, turn: "w" });
-        }
+        dispatch({ tag: "BoardOrientationChanged", orientation: "white" });
     });
     els.btnRowAnalyseBlack.addEventListener("click", () => {
-        const model = getModel();
-        const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
-        if (active) {
-            dispatch({ tag: "AnalysisStarted", gameId: active, turn: "b" });
-        }
+        dispatch({ tag: "BoardOrientationChanged", orientation: "black" });
     });
     els.btnRowCopyFen.addEventListener("click", () => dispatch({ tag: "CopyFen" }));
     els.btnRowCopyPgn.addEventListener("click", () => dispatch({ tag: "CopyPgn" }));

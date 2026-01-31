@@ -69,5 +69,6 @@ export type Msg =
   | { tag: "BoardFenUpdated"; fen: FenFull }
   | { tag: "CopyFen" }
   | { tag: "CopyPgn" }
+  | { tag: "BoardOrientationChanged"; orientation: "white" | "black" }
   | { tag: "OpeningsInputShown"; content: string }
   | { tag: "OpeningsInputHidden" };

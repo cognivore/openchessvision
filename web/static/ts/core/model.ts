@@ -119,6 +119,7 @@ export type UiState = Readonly<{
   selectedPiece: string | null;
   editingPosition: boolean;
   settingUpFen: boolean;
+  boardOrientation: "white" | "black";
 }>;
 
 export type Model = Readonly<{
@@ -183,6 +184,7 @@ export const initialModel: Model = {
     selectedPiece: null,
     editingPosition: false,
     settingUpFen: false,
+    boardOrientation: "white",
   },
   placementKeyIndex: {},
 };

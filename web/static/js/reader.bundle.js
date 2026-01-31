@@ -45,7 +45,8 @@
       openingMovesInput: "",
       selectedPiece: null,
       editingPosition: false,
-      settingUpFen: false
+      settingUpFen: false,
+      boardOrientation: "white"
     },
     placementKeyIndex: {}
   };
@@ -1265,6 +1266,14 @@
         const pgn = toPGN(ctx.tree);
         return [model, [{ tag: "CLIPBOARD_WRITE", text: pgn }]];
       }
+      case "BoardOrientationChanged":
+        return [
+          {
+            ...model,
+            ui: { ...model.ui, boardOrientation: msg.orientation }
+          },
+          [{ tag: "CHESSBOARD_FLIP", orientation: msg.orientation }]
+        ];
       case "OpeningsInputShown":
         return [
           {
@@ -2069,18 +2078,10 @@
     els.btnRowDone.addEventListener("click", () => dispatch({ tag: "ReachDone" }));
     els.btnRowCancel.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
     els.btnRowAnalyseWhite.addEventListener("click", () => {
-      const model = getModel();
-      const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
-      if (active) {
-        dispatch({ tag: "AnalysisStarted", gameId: active, turn: "w" });
-      }
+      dispatch({ tag: "BoardOrientationChanged", orientation: "white" });
     });
     els.btnRowAnalyseBlack.addEventListener("click", () => {
-      const model = getModel();
-      const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
-      if (active) {
-        dispatch({ tag: "AnalysisStarted", gameId: active, turn: "b" });
-      }
+      dispatch({ tag: "BoardOrientationChanged", orientation: "black" });
     });
     els.btnRowCopyFen.addEventListener("click", () => dispatch({ tag: "CopyFen" }));
     els.btnRowCopyPgn.addEventListener("click", () => dispatch({ tag: "CopyPgn" }));
@@ -3367,6 +3368,11 @@
           } catch {
             dispatch({ tag: "Error", scope: "clipboard", message: "Clipboard unavailable" });
           }
+          return;
+        case "CHESSBOARD_FLIP":
+          resources.boardRow.now?.orientation(cmd.orientation);
+          resources.boardRow.before?.orientation(cmd.orientation);
+          resources.boardRow.after?.orientation(cmd.orientation);
           return;
         case "CHESSBOARD_READ_PREVIEW":
           if (resources.boardRow.now) {

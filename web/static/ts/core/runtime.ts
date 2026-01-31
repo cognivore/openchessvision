@@ -626,6 +626,12 @@ export const createRuntime = (initial: Model) => {
           dispatch({ tag: "Error", scope: "clipboard", message: "Clipboard unavailable" });
         }
         return;
+      case "CHESSBOARD_FLIP":
+        // Flip all boards in the board row
+        resources.boardRow.now?.orientation(cmd.orientation);
+        resources.boardRow.before?.orientation(cmd.orientation);
+        resources.boardRow.after?.orientation(cmd.orientation);
+        return;
       case "CHESSBOARD_READ_PREVIEW":
         // Read from board row's now board (used for piece editing confirmation)
         if (resources.boardRow.now) {

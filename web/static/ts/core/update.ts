@@ -1018,6 +1018,14 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       const pgn = toPGN(ctx.tree);
       return [model, [{ tag: "CLIPBOARD_WRITE", text: pgn }]];
     }
+    case "BoardOrientationChanged":
+      return [
+        {
+          ...model,
+          ui: { ...model.ui, boardOrientation: msg.orientation },
+        },
+        [{ tag: "CHESSBOARD_FLIP", orientation: msg.orientation }],
+      ];
     case "OpeningsInputShown":
       return [
         {
