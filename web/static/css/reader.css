@@ -346,9 +346,7 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    max-height: 320px;
-    overflow: hidden;
-    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    /* No max-height - let content determine size */
 }
 
 .board-row.hidden {

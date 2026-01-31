@@ -7,7 +7,7 @@ import { asSan } from "../domain/chess/san";
 import { clearOverlay, renderOverlay } from "./adapters/overlay";
 
 // Board row mode determines which boards and actions to show
-type BoardRowMode = 
+type BoardRowMode =
   | { tag: "hidden" }
   | { tag: "confirm"; fen: string }
   | { tag: "edit"; fen: string }
