@@ -32,6 +32,14 @@ type Resources = {
     entry: ChessboardInstance | null;
     target: ChessboardInstance | null;
   };
+  // Board row boards
+  boardRow: {
+    before: ChessboardInstance | null;
+    now: ChessboardInstance | null;
+    after: ChessboardInstance | null;
+    nowGame: Chess | null;  // For interactive now board
+    currentMode: string | null;  // Track current mode to detect changes
+  };
   stockfish: ReturnType<typeof createStockfish> | null;
   boardStatusTimer: number | null;
   chessnutPollTimer: number | null;
@@ -45,6 +53,7 @@ const createResources = (): Resources => ({
   analysisGame: null,
   reachGame: null,
   reachBoards: { start: null, entry: null, target: null },
+  boardRow: { before: null, now: null, after: null, nowGame: null, currentMode: null },
   stockfish: null,
   boardStatusTimer: null,
   chessnutPollTimer: null,
@@ -77,6 +86,7 @@ export const createRuntime = (initial: Model) => {
     render(model, dispatch);
     syncPreviewBoard();
     syncReachBoards();
+    syncBoardRow();
     cmds.forEach((cmd) => {
       void runCmd(cmd);
     });
@@ -151,6 +161,227 @@ export const createRuntime = (initial: Model) => {
       resources.reachGame = new Chess(model.workflow.session.currentFen);
     }
     resources.reachBoards.entry?.position(String(model.workflow.session.currentFen));
+  };
+
+  const syncBoardRow = (): void => {
+    const workflow = model.workflow;
+    const modeKey = workflow.tag;
+    
+    // Destroy boards if mode changes or workflow closes
+    if (modeKey === "NO_PDF" || modeKey === "VIEWING") {
+      if (resources.boardRow.currentMode !== null) {
+        resources.boardRow.before?.destroy();
+        resources.boardRow.now?.destroy();
+        resources.boardRow.after?.destroy();
+        resources.boardRow = { before: null, now: null, after: null, nowGame: null, currentMode: null };
+      }
+      return;
+    }
+    
+    // Mode changed - rebuild boards
+    if (resources.boardRow.currentMode !== modeKey) {
+      resources.boardRow.before?.destroy();
+      resources.boardRow.now?.destroy();
+      resources.boardRow.after?.destroy();
+      resources.boardRow.nowGame = null;
+      
+      const pieceTheme = "/static/vendor/img/chesspieces/wikipedia/{piece}.png";
+      
+      switch (workflow.tag) {
+        case "PENDING_CONFIRM": {
+          // Single board showing detected position
+          resources.boardRow.now = createBoard("now-board", {
+            position: String(workflow.pending.targetFen),
+            draggable: false,
+            showNotation: false,
+            pieceTheme,
+          });
+          resources.boardRow.before = null;
+          resources.boardRow.after = null;
+          break;
+        }
+        
+        case "MATCH_EXISTING": {
+          // Before (selected game) + Now (detected)
+          const selectedId = workflow.selected;
+          const selectedGame = selectedId ? model.games.find(g => g.id === selectedId) : null;
+          if (selectedGame) {
+            resources.boardRow.before = createBoard("before-board", {
+              position: String(selectedGame.fen),
+              draggable: false,
+              showNotation: false,
+              pieceTheme,
+            });
+          }
+          resources.boardRow.now = createBoard("now-board", {
+            position: String(workflow.pending.targetFen),
+            draggable: false,
+            showNotation: false,
+            pieceTheme,
+          });
+          resources.boardRow.after = null;
+          break;
+        }
+        
+        case "REACHING": {
+          const session = workflow.session;
+          resources.boardRow.nowGame = new Chess(session.startFen);
+          
+          // Before (start position)
+          resources.boardRow.before = createBoard("before-board", {
+            position: String(session.startFen).split(" ")[0],
+            draggable: false,
+            showNotation: false,
+            pieceTheme,
+          });
+          
+          // Now (interactive entry board)
+          const onDragStart = (_source: string, piece: string) => {
+            if (!resources.boardRow.nowGame) return false;
+            if (resources.boardRow.nowGame.game_over()) return false;
+            const turn = resources.boardRow.nowGame.turn();
+            if ((turn === "w" && piece.startsWith("b")) || (turn === "b" && piece.startsWith("w"))) {
+              return false;
+            }
+            return true;
+          };
+          const onDrop = (source: string, target: string) => {
+            if (!resources.boardRow.nowGame) return "snapback";
+            const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
+            if (!move) return "snapback";
+            dispatch({ tag: "ReachMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
+            return undefined;
+          };
+          const onSnapEnd = () => {
+            if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+            resources.boardRow.now.position(resources.boardRow.nowGame.fen());
+          };
+          
+          resources.boardRow.now = createBoard("now-board", {
+            position: String(session.startFen).split(" ")[0],
+            draggable: true,
+            showNotation: true,
+            pieceTheme,
+            onDragStart,
+            onDrop,
+            onSnapEnd,
+          });
+          
+          // After (target position)
+          resources.boardRow.after = createBoard("after-board", {
+            position: String(session.targetFen),
+            draggable: false,
+            showNotation: false,
+            pieceTheme,
+          });
+          break;
+        }
+        
+        case "ANALYSIS": {
+          const game = model.games.find(g => g.id === workflow.activeGameId);
+          const tree = model.analyses[workflow.activeGameId];
+          let currentFen = game?.fen ?? "start";
+          
+          // Get FEN at current cursor position
+          if (tree && workflow.cursor.length > 0) {
+            let node = tree.root;
+            for (const san of workflow.cursor) {
+              const child = node.children.find(c => c.san === san);
+              if (child) {
+                node = child;
+              } else {
+                break;
+              }
+            }
+            currentFen = node.fen.split(" ")[0];
+          }
+          
+          resources.boardRow.nowGame = new Chess(currentFen);
+          
+          const onDrop = (source: string, target: string) => {
+            if (!resources.boardRow.nowGame) return "snapback";
+            const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
+            if (!move) return "snapback";
+            dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
+            return undefined;
+          };
+          const onSnapEnd = () => {
+            if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+            resources.boardRow.now.position(resources.boardRow.nowGame.fen());
+          };
+          
+          resources.boardRow.now = createBoard("now-board", {
+            position: currentFen,
+            draggable: true,
+            showNotation: true,
+            pieceTheme,
+            onDrop,
+            onSnapEnd,
+          });
+          resources.boardRow.before = null;
+          resources.boardRow.after = null;
+          break;
+        }
+      }
+      
+      resources.boardRow.currentMode = modeKey;
+      
+      // Trigger resize after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        resources.boardRow.before?.resize();
+        resources.boardRow.now?.resize();
+        resources.boardRow.after?.resize();
+      }, 50);
+      return;
+    }
+    
+    // Mode hasn't changed - just update positions if needed
+    switch (workflow.tag) {
+      case "REACHING": {
+        const session = workflow.session;
+        // Sync now board with current game state
+        if (!resources.boardRow.nowGame || resources.boardRow.nowGame.fen() !== String(session.currentFen)) {
+          resources.boardRow.nowGame = new Chess(session.currentFen);
+        }
+        resources.boardRow.now?.position(String(session.currentFen));
+        break;
+      }
+      
+      case "ANALYSIS": {
+        const tree = model.analyses[workflow.activeGameId];
+        const game = model.games.find(g => g.id === workflow.activeGameId);
+        let currentFen = game?.fen ?? "start";
+        
+        if (tree && workflow.cursor.length > 0) {
+          let node = tree.root;
+          for (const san of workflow.cursor) {
+            const child = node.children.find(c => c.san === san);
+            if (child) {
+              node = child;
+            } else {
+              break;
+            }
+          }
+          currentFen = node.fen;
+        }
+        
+        resources.boardRow.now?.position(currentFen.split(" ")[0]);
+        if (resources.boardRow.nowGame) {
+          resources.boardRow.nowGame = new Chess(currentFen);
+        }
+        break;
+      }
+      
+      case "MATCH_EXISTING": {
+        // Update before board if selection changed
+        const selectedId = workflow.selected;
+        const selectedGame = selectedId ? model.games.find(g => g.id === selectedId) : null;
+        if (selectedGame && resources.boardRow.before) {
+          resources.boardRow.before.position(String(selectedGame.fen));
+        }
+        break;
+      }
+    }
   };
 
   const runCmd = async (cmd: Cmd): Promise<void> => {
@@ -492,6 +723,7 @@ export const createRuntime = (initial: Model) => {
   render(model, dispatch);
   syncPreviewBoard();
   syncReachBoards();
+  syncBoardRow();
   window.addEventListener("beforeunload", (event) => {
     if (model.isDirty && model.pdf.id) {
       void runCmd({ tag: "STUDY_SAVE", pdfId: model.pdf.id });

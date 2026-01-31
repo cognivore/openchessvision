@@ -376,7 +376,8 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
     }
     case "EditPieces":
       return [withStatus(model, "Edit pieces using the palette, then confirm"), noCmd];
-    case "SelectCandidate": {
+    case "SelectCandidate":
+    case "MatchGameSelected": {
       if (model.workflow.tag !== "MATCH_EXISTING") {
         return [model, noCmd];
       }

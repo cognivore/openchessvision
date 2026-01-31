@@ -642,7 +642,8 @@
       }
       case "EditPieces":
         return [withStatus(model, "Edit pieces using the palette, then confirm"), noCmd];
-      case "SelectCandidate": {
+      case "SelectCandidate":
+      case "MatchGameSelected": {
         if (model.workflow.tag !== "MATCH_EXISTING") {
           return [model, noCmd];
         }
@@ -1280,7 +1281,48 @@
     reachBtnUndo: byId("reach-btn-undo"),
     reachBtnReset: byId("reach-btn-reset"),
     reachBtnDone: byId("reach-btn-done"),
-    reachBtnCancel: byId("reach-btn-cancel")
+    reachBtnCancel: byId("reach-btn-cancel"),
+    // Board row elements
+    boardRow: byId("board-row"),
+    boardSlotBefore: byId("board-slot-before"),
+    boardSlotNow: byId("board-slot-now"),
+    boardSlotAfter: byId("board-slot-after"),
+    beforeBoard: byId("before-board"),
+    nowBoard: byId("now-board"),
+    afterBoard: byId("after-board"),
+    beforeBoardInfo: byId("before-board-info"),
+    nowBoardInfo: byId("now-board-info"),
+    afterBoardInfo: byId("after-board-info"),
+    boardRowActions: byId("board-row-actions"),
+    boardRowReachIndicator: byId("board-row-reach-indicator"),
+    // Board row action groups
+    boardRowConfirm: byId("board-row-confirm"),
+    boardRowMatch: byId("board-row-match"),
+    boardRowReach: byId("board-row-reach"),
+    boardRowAnalysis: byId("board-row-analysis"),
+    boardRowHowReach: byId("board-row-how-reach"),
+    // Board row buttons - confirm
+    btnRowConfirm: byId("btn-row-confirm"),
+    btnRowEdit: byId("btn-row-edit"),
+    // Board row buttons - match
+    matchGameSelect: byId("match-game-select"),
+    btnRowContinue: byId("btn-row-continue"),
+    btnRowNewGame: byId("btn-row-new-game"),
+    // Board row buttons - reach
+    boardRowReachStatus: byId("board-row-reach-status"),
+    btnRowUndo: byId("btn-row-undo"),
+    btnRowReset: byId("btn-row-reset"),
+    btnRowDone: byId("btn-row-done"),
+    btnRowCancel: byId("btn-row-cancel"),
+    // Board row buttons - analysis
+    btnRowAnalyseWhite: byId("btn-row-analyse-white"),
+    btnRowAnalyseBlack: byId("btn-row-analyse-black"),
+    btnRowCopyFen: byId("btn-row-copy-fen"),
+    btnRowCopyPgn: byId("btn-row-copy-pgn"),
+    btnRowClose: byId("btn-row-close"),
+    // Board row buttons - how to reach
+    btnRowOtb: byId("btn-row-otb"),
+    btnRowManual: byId("btn-row-manual")
   });
   var els = new Proxy({}, {
     get(_target, prop) {
@@ -1514,29 +1556,17 @@
   };
   var renderOverlayBoards = (model) => {
     const activeGame = getActiveGame(model);
-    if (!activeGame) {
+    if (!activeGame || model.workflow.tag !== "VIEWING") {
       toggleHidden(els.boardOverlay, false);
       return;
     }
     const displayBbox = pdfToCssBBox(activeGame.bbox, model.pdf.scale);
-    if (model.workflow.tag === "ANALYSIS") {
-      const newSize = 300;
-      const centerX = displayBbox.x + displayBbox.width / 2;
-      const centerY = displayBbox.y + displayBbox.height / 2;
-      els.boardOverlay.style.left = `${centerX - newSize / 2}px`;
-      els.boardOverlay.style.top = `${centerY - newSize / 2}px`;
-      els.boardOverlay.style.width = `${newSize}px`;
-      els.boardOverlay.style.height = `${newSize}px`;
-      els.boardOverlay.classList.remove("transparent");
-      els.boardOverlay.classList.add("solid");
-    } else {
-      els.boardOverlay.style.left = `${displayBbox.x}px`;
-      els.boardOverlay.style.top = `${displayBbox.y}px`;
-      els.boardOverlay.style.width = `${displayBbox.width}px`;
-      els.boardOverlay.style.height = `${displayBbox.height}px`;
-      els.boardOverlay.classList.add("transparent");
-      els.boardOverlay.classList.remove("solid");
-    }
+    els.boardOverlay.style.left = `${displayBbox.x}px`;
+    els.boardOverlay.style.top = `${displayBbox.y}px`;
+    els.boardOverlay.style.width = `${displayBbox.width}px`;
+    els.boardOverlay.style.height = `${displayBbox.height}px`;
+    els.boardOverlay.classList.add("transparent");
+    els.boardOverlay.classList.remove("solid");
     toggleHidden(els.boardOverlay, true);
   };
   var renderDiagramOverlay = (model, dispatch) => {
@@ -1651,6 +1681,119 @@
       return `<div class="reach-move">${prefix} ${move}</div>`;
     }).join("");
   };
+  var getBoardRowMode = (model) => {
+    switch (model.workflow.tag) {
+      case "NO_PDF":
+        return { tag: "hidden" };
+      case "VIEWING":
+        return { tag: "hidden" };
+      case "PENDING_CONFIRM":
+        return { tag: "confirm", fen: String(model.workflow.pending.targetFen) };
+      case "MATCH_EXISTING": {
+        const selectedId = model.workflow.selected;
+        const selectedGame = selectedId ? model.games.find((g) => g.id === selectedId) : null;
+        return {
+          tag: "match",
+          beforeFen: selectedGame ? String(selectedGame.fen) : null,
+          nowFen: String(model.workflow.pending.targetFen),
+          candidates: model.workflow.candidates
+        };
+      }
+      case "REACHING": {
+        const session = model.workflow.session;
+        const currentPlacement = String(session.currentFen).split(" ")[0];
+        return {
+          tag: "reach",
+          beforeFen: String(session.startFen),
+          nowFen: String(session.currentFen),
+          afterFen: String(session.targetFen),
+          moves: session.moves.length,
+          reached: currentPlacement === String(session.targetFen)
+        };
+      }
+      case "ANALYSIS": {
+        const game = model.games.find((g) => g.id === model.workflow.activeGameId);
+        const tree = model.analyses[model.workflow.activeGameId];
+        let fen = game?.fen ?? "start";
+        if (tree && model.workflow.cursor.length > 0) {
+          let node = tree.root;
+          for (const san of model.workflow.cursor) {
+            const child = node.children.find((c) => c.san === san);
+            if (child) {
+              node = child;
+            } else {
+              break;
+            }
+          }
+          fen = node.fen.split(" ")[0];
+        }
+        return { tag: "analysis", fen };
+      }
+    }
+  };
+  var renderBoardRow = (model, dispatch) => {
+    const mode = getBoardRowMode(model);
+    toggleHidden(els.boardRowConfirm, false);
+    toggleHidden(els.boardRowMatch, false);
+    toggleHidden(els.boardRowReach, false);
+    toggleHidden(els.boardRowAnalysis, false);
+    toggleHidden(els.boardRowHowReach, false);
+    if (mode.tag === "hidden") {
+      els.boardRow.classList.add("hidden");
+      return;
+    }
+    els.boardRow.classList.remove("hidden");
+    switch (mode.tag) {
+      case "confirm":
+        toggleHidden(els.boardSlotBefore, false);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowConfirm, true);
+        setText(els.nowBoardInfo, "Detected position");
+        break;
+      case "match":
+        toggleHidden(els.boardSlotBefore, mode.beforeFen !== null);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowMatch, true);
+        setText(els.beforeBoardInfo, "Previous game");
+        setText(els.nowBoardInfo, "Detected position");
+        els.matchGameSelect.innerHTML = mode.candidates.map((id, idx) => {
+          const game = model.games.find((g) => g.id === id);
+          return `<option value="${id}">Game ${idx + 1} (Page ${game?.page ?? "?"})</option>`;
+        }).join("");
+        break;
+      case "reach":
+        toggleHidden(els.boardSlotBefore, true);
+        toggleHidden(els.boardSlotAfter, true);
+        toggleHidden(els.boardRowReach, true);
+        setText(els.beforeBoardInfo, "Starting position");
+        setText(els.nowBoardInfo, "Enter moves here");
+        if (mode.reached) {
+          els.boardRowReachIndicator.textContent = "\u2713 Position reached!";
+          els.boardRowReachIndicator.classList.add("reached");
+          els.boardRowReachIndicator.classList.remove("not-reached");
+        } else {
+          els.boardRowReachIndicator.textContent = "Target position";
+          els.boardRowReachIndicator.classList.remove("reached");
+          els.boardRowReachIndicator.classList.add("not-reached");
+        }
+        setText(els.boardRowReachStatus, `Moves: ${mode.moves}`);
+        els.btnRowUndo.disabled = mode.moves === 0;
+        els.btnRowDone.disabled = mode.moves === 0;
+        break;
+      case "analysis":
+        toggleHidden(els.boardSlotBefore, false);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowAnalysis, true);
+        setText(els.nowBoardInfo, "");
+        break;
+      case "howReach":
+        toggleHidden(els.boardSlotBefore, false);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowHowReach, true);
+        setText(els.nowBoardInfo, "How to reach?");
+        break;
+    }
+  };
   var render = (model, dispatch) => {
     const hasPdf = Boolean(model.pdf.id);
     toggleHidden(els.noPdfMessage, !hasPdf);
@@ -1686,6 +1829,7 @@
     renderDiagramOverlay(model, dispatch);
     renderAnalysis(model, dispatch);
     renderReachModal(model);
+    renderBoardRow(model, dispatch);
   };
 
   // static/ts/ui/bindings.ts
@@ -1797,6 +1941,39 @@
     if (backdrop) {
       backdrop.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
     }
+    els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
+    els.btnRowContinue.addEventListener("click", () => dispatch({ tag: "ContinueSelectedGame" }));
+    els.btnRowNewGame.addEventListener("click", () => dispatch({ tag: "StartNewGame" }));
+    els.matchGameSelect.addEventListener("change", () => {
+      const selectedId = els.matchGameSelect.value;
+      if (selectedId) {
+        dispatch({ tag: "MatchGameSelected", gameId: selectedId });
+      }
+    });
+    els.btnRowUndo.addEventListener("click", () => dispatch({ tag: "ReachUndo" }));
+    els.btnRowReset.addEventListener("click", () => dispatch({ tag: "ReachReset" }));
+    els.btnRowDone.addEventListener("click", () => dispatch({ tag: "ReachDone" }));
+    els.btnRowCancel.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
+    els.btnRowAnalyseWhite.addEventListener("click", () => {
+      const model = getModel();
+      const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
+      if (active) {
+        dispatch({ tag: "AnalysisStarted", gameId: active, turn: "w" });
+      }
+    });
+    els.btnRowAnalyseBlack.addEventListener("click", () => {
+      const model = getModel();
+      const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
+      if (active) {
+        dispatch({ tag: "AnalysisStarted", gameId: active, turn: "b" });
+      }
+    });
+    els.btnRowCopyFen.addEventListener("click", () => dispatch({ tag: "CopyFen" }));
+    els.btnRowCopyPgn.addEventListener("click", () => dispatch({ tag: "CopyPgn" }));
+    els.btnRowClose.addEventListener("click", () => dispatch({ tag: "DiagramActivated", gameId: null }));
+    els.btnRowOtb.addEventListener("click", () => dispatch({ tag: "ReachStartOtb" }));
+    els.btnRowManual.addEventListener("click", () => dispatch({ tag: "ReachStartManual" }));
     document.addEventListener("keydown", (event) => {
       const target = event.target;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
@@ -2559,6 +2736,7 @@
     analysisGame: null,
     reachGame: null,
     reachBoards: { start: null, entry: null, target: null },
+    boardRow: { before: null, now: null, after: null, nowGame: null, currentMode: null },
     stockfish: null,
     boardStatusTimer: null,
     chessnutPollTimer: null,
@@ -2586,6 +2764,7 @@
       render(model, dispatch);
       syncPreviewBoard();
       syncReachBoards();
+      syncBoardRow();
       cmds.forEach((cmd) => {
         void runCmd(cmd);
       });
@@ -2649,6 +2828,192 @@
         resources.reachGame = new Chess(model.workflow.session.currentFen);
       }
       resources.reachBoards.entry?.position(String(model.workflow.session.currentFen));
+    };
+    const syncBoardRow = () => {
+      const workflow = model.workflow;
+      const modeKey = workflow.tag;
+      if (modeKey === "NO_PDF" || modeKey === "VIEWING") {
+        if (resources.boardRow.currentMode !== null) {
+          resources.boardRow.before?.destroy();
+          resources.boardRow.now?.destroy();
+          resources.boardRow.after?.destroy();
+          resources.boardRow = { before: null, now: null, after: null, nowGame: null, currentMode: null };
+        }
+        return;
+      }
+      if (resources.boardRow.currentMode !== modeKey) {
+        resources.boardRow.before?.destroy();
+        resources.boardRow.now?.destroy();
+        resources.boardRow.after?.destroy();
+        resources.boardRow.nowGame = null;
+        const pieceTheme2 = "/static/vendor/img/chesspieces/wikipedia/{piece}.png";
+        switch (workflow.tag) {
+          case "PENDING_CONFIRM": {
+            resources.boardRow.now = createBoard("now-board", {
+              position: String(workflow.pending.targetFen),
+              draggable: false,
+              showNotation: false,
+              pieceTheme: pieceTheme2
+            });
+            resources.boardRow.before = null;
+            resources.boardRow.after = null;
+            break;
+          }
+          case "MATCH_EXISTING": {
+            const selectedId = workflow.selected;
+            const selectedGame = selectedId ? model.games.find((g) => g.id === selectedId) : null;
+            if (selectedGame) {
+              resources.boardRow.before = createBoard("before-board", {
+                position: String(selectedGame.fen),
+                draggable: false,
+                showNotation: false,
+                pieceTheme: pieceTheme2
+              });
+            }
+            resources.boardRow.now = createBoard("now-board", {
+              position: String(workflow.pending.targetFen),
+              draggable: false,
+              showNotation: false,
+              pieceTheme: pieceTheme2
+            });
+            resources.boardRow.after = null;
+            break;
+          }
+          case "REACHING": {
+            const session = workflow.session;
+            resources.boardRow.nowGame = new Chess(session.startFen);
+            resources.boardRow.before = createBoard("before-board", {
+              position: String(session.startFen).split(" ")[0],
+              draggable: false,
+              showNotation: false,
+              pieceTheme: pieceTheme2
+            });
+            const onDragStart = (_source, piece) => {
+              if (!resources.boardRow.nowGame) return false;
+              if (resources.boardRow.nowGame.game_over()) return false;
+              const turn = resources.boardRow.nowGame.turn();
+              if (turn === "w" && piece.startsWith("b") || turn === "b" && piece.startsWith("w")) {
+                return false;
+              }
+              return true;
+            };
+            const onDrop = (source, target) => {
+              if (!resources.boardRow.nowGame) return "snapback";
+              const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
+              if (!move) return "snapback";
+              dispatch({ tag: "ReachMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
+              return void 0;
+            };
+            const onSnapEnd = () => {
+              if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+              resources.boardRow.now.position(resources.boardRow.nowGame.fen());
+            };
+            resources.boardRow.now = createBoard("now-board", {
+              position: String(session.startFen).split(" ")[0],
+              draggable: true,
+              showNotation: true,
+              pieceTheme: pieceTheme2,
+              onDragStart,
+              onDrop,
+              onSnapEnd
+            });
+            resources.boardRow.after = createBoard("after-board", {
+              position: String(session.targetFen),
+              draggable: false,
+              showNotation: false,
+              pieceTheme: pieceTheme2
+            });
+            break;
+          }
+          case "ANALYSIS": {
+            const game = model.games.find((g) => g.id === workflow.activeGameId);
+            const tree = model.analyses[workflow.activeGameId];
+            let currentFen = game?.fen ?? "start";
+            if (tree && workflow.cursor.length > 0) {
+              let node = tree.root;
+              for (const san of workflow.cursor) {
+                const child = node.children.find((c) => c.san === san);
+                if (child) {
+                  node = child;
+                } else {
+                  break;
+                }
+              }
+              currentFen = node.fen.split(" ")[0];
+            }
+            resources.boardRow.nowGame = new Chess(currentFen);
+            const onDrop = (source, target) => {
+              if (!resources.boardRow.nowGame) return "snapback";
+              const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
+              if (!move) return "snapback";
+              dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
+              return void 0;
+            };
+            const onSnapEnd = () => {
+              if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+              resources.boardRow.now.position(resources.boardRow.nowGame.fen());
+            };
+            resources.boardRow.now = createBoard("now-board", {
+              position: currentFen,
+              draggable: true,
+              showNotation: true,
+              pieceTheme: pieceTheme2,
+              onDrop,
+              onSnapEnd
+            });
+            resources.boardRow.before = null;
+            resources.boardRow.after = null;
+            break;
+          }
+        }
+        resources.boardRow.currentMode = modeKey;
+        setTimeout(() => {
+          resources.boardRow.before?.resize();
+          resources.boardRow.now?.resize();
+          resources.boardRow.after?.resize();
+        }, 50);
+        return;
+      }
+      switch (workflow.tag) {
+        case "REACHING": {
+          const session = workflow.session;
+          if (!resources.boardRow.nowGame || resources.boardRow.nowGame.fen() !== String(session.currentFen)) {
+            resources.boardRow.nowGame = new Chess(session.currentFen);
+          }
+          resources.boardRow.now?.position(String(session.currentFen));
+          break;
+        }
+        case "ANALYSIS": {
+          const tree = model.analyses[workflow.activeGameId];
+          const game = model.games.find((g) => g.id === workflow.activeGameId);
+          let currentFen = game?.fen ?? "start";
+          if (tree && workflow.cursor.length > 0) {
+            let node = tree.root;
+            for (const san of workflow.cursor) {
+              const child = node.children.find((c) => c.san === san);
+              if (child) {
+                node = child;
+              } else {
+                break;
+              }
+            }
+            currentFen = node.fen;
+          }
+          resources.boardRow.now?.position(currentFen.split(" ")[0]);
+          if (resources.boardRow.nowGame) {
+            resources.boardRow.nowGame = new Chess(currentFen);
+          }
+          break;
+        }
+        case "MATCH_EXISTING": {
+          const selectedId = workflow.selected;
+          const selectedGame = selectedId ? model.games.find((g) => g.id === selectedId) : null;
+          if (selectedGame && resources.boardRow.before) {
+            resources.boardRow.before.position(String(selectedGame.fen));
+          }
+          break;
+        }
+      }
     };
     const runCmd = async (cmd) => {
       switch (cmd.tag) {
@@ -2986,6 +3351,7 @@
     render(model, dispatch);
     syncPreviewBoard();
     syncReachBoards();
+    syncBoardRow();
     window.addEventListener("beforeunload", (event) => {
       if (model.isDirty && model.pdf.id) {
         void runCmd({ tag: "STUDY_SAVE", pdfId: model.pdf.id });

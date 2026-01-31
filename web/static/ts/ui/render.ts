@@ -1,10 +1,19 @@
 import type { Msg } from "../core/msg";
-import type { Model } from "../core/model";
+import type { Model, GameId } from "../core/model";
 import { getActiveGame, getActiveGameId } from "../core/selectors";
 import { pdfToCssBBox } from "../domain/pdf/bbox";
 import { els } from "./dom";
 import { asSan } from "../domain/chess/san";
 import { clearOverlay, renderOverlay } from "./adapters/overlay";
+
+// Board row mode determines which boards and actions to show
+type BoardRowMode = 
+  | { tag: "hidden" }
+  | { tag: "confirm"; fen: string }
+  | { tag: "match"; beforeFen: string | null; nowFen: string; candidates: ReadonlyArray<GameId> }
+  | { tag: "reach"; beforeFen: string; nowFen: string; afterFen: string; moves: number; reached: boolean }
+  | { tag: "analysis"; fen: string }
+  | { tag: "howReach"; fen: string };
 
 type Dispatch = (msg: Msg) => void;
 
@@ -94,29 +103,19 @@ const renderWorkflowPanels = (model: Model): void => {
 
 const renderOverlayBoards = (model: Model): void => {
   const activeGame = getActiveGame(model);
-  if (!activeGame) {
+  // Only show transparent overlay in VIEWING mode (for alignment verification)
+  // In ANALYSIS, PENDING_CONFIRM, MATCH_EXISTING, and REACHING modes, use the board row instead
+  if (!activeGame || model.workflow.tag !== "VIEWING") {
     toggleHidden(els.boardOverlay, false);
     return;
   }
   const displayBbox = pdfToCssBBox(activeGame.bbox, model.pdf.scale);
-  if (model.workflow.tag === "ANALYSIS") {
-    const newSize = 300;
-    const centerX = (displayBbox.x as number) + (displayBbox.width as number) / 2;
-    const centerY = (displayBbox.y as number) + (displayBbox.height as number) / 2;
-    els.boardOverlay.style.left = `${centerX - newSize / 2}px`;
-    els.boardOverlay.style.top = `${centerY - newSize / 2}px`;
-    els.boardOverlay.style.width = `${newSize}px`;
-    els.boardOverlay.style.height = `${newSize}px`;
-    els.boardOverlay.classList.remove("transparent");
-    els.boardOverlay.classList.add("solid");
-  } else {
-    els.boardOverlay.style.left = `${displayBbox.x}px`;
-    els.boardOverlay.style.top = `${displayBbox.y}px`;
-    els.boardOverlay.style.width = `${displayBbox.width}px`;
-    els.boardOverlay.style.height = `${displayBbox.height}px`;
-    els.boardOverlay.classList.add("transparent");
-    els.boardOverlay.classList.remove("solid");
-  }
+  els.boardOverlay.style.left = `${displayBbox.x}px`;
+  els.boardOverlay.style.top = `${displayBbox.y}px`;
+  els.boardOverlay.style.width = `${displayBbox.width}px`;
+  els.boardOverlay.style.height = `${displayBbox.height}px`;
+  els.boardOverlay.classList.add("transparent");
+  els.boardOverlay.classList.remove("solid");
   toggleHidden(els.boardOverlay, true);
 };
 
@@ -247,6 +246,143 @@ const renderReachModal = (model: Model): void => {
     .join("");
 };
 
+const getBoardRowMode = (model: Model): BoardRowMode => {
+  switch (model.workflow.tag) {
+    case "NO_PDF":
+      return { tag: "hidden" };
+    case "VIEWING":
+      // In viewing mode, we don't show the board row (transparent overlay on PDF instead)
+      return { tag: "hidden" };
+    case "PENDING_CONFIRM":
+      return { tag: "confirm", fen: String(model.workflow.pending.targetFen) };
+    case "MATCH_EXISTING": {
+      const selectedId = model.workflow.selected;
+      const selectedGame = selectedId ? model.games.find(g => g.id === selectedId) : null;
+      return {
+        tag: "match",
+        beforeFen: selectedGame ? String(selectedGame.fen) : null,
+        nowFen: String(model.workflow.pending.targetFen),
+        candidates: model.workflow.candidates,
+      };
+    }
+    case "REACHING": {
+      const session = model.workflow.session;
+      const currentPlacement = String(session.currentFen).split(" ")[0];
+      return {
+        tag: "reach",
+        beforeFen: String(session.startFen),
+        nowFen: String(session.currentFen),
+        afterFen: String(session.targetFen),
+        moves: session.moves.length,
+        reached: currentPlacement === String(session.targetFen),
+      };
+    }
+    case "ANALYSIS": {
+      const game = model.games.find(g => g.id === model.workflow.activeGameId);
+      const tree = model.analyses[model.workflow.activeGameId];
+      // Get FEN at current cursor position
+      let fen = game?.fen ?? "start";
+      if (tree && model.workflow.cursor.length > 0) {
+        // Navigate to cursor position
+        let node = tree.root;
+        for (const san of model.workflow.cursor) {
+          const child = node.children.find(c => c.san === san);
+          if (child) {
+            node = child;
+          } else {
+            break;
+          }
+        }
+        fen = node.fen.split(" ")[0]; // Just the placement part
+      }
+      return { tag: "analysis", fen };
+    }
+  }
+};
+
+const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
+  const mode = getBoardRowMode(model);
+  
+  // Hide all action groups first
+  toggleHidden(els.boardRowConfirm, false);
+  toggleHidden(els.boardRowMatch, false);
+  toggleHidden(els.boardRowReach, false);
+  toggleHidden(els.boardRowAnalysis, false);
+  toggleHidden(els.boardRowHowReach, false);
+  
+  // Hide board row if no mode
+  if (mode.tag === "hidden") {
+    els.boardRow.classList.add("hidden");
+    return;
+  }
+  
+  // Show board row
+  els.boardRow.classList.remove("hidden");
+  
+  // Configure slots based on mode
+  switch (mode.tag) {
+    case "confirm":
+      // Only "Now" board, confirm/edit actions
+      toggleHidden(els.boardSlotBefore, false);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowConfirm, true);
+      setText(els.nowBoardInfo, "Detected position");
+      break;
+      
+    case "match":
+      // "Before" (selected game) + "Now" (detected), match actions
+      toggleHidden(els.boardSlotBefore, mode.beforeFen !== null);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowMatch, true);
+      setText(els.beforeBoardInfo, "Previous game");
+      setText(els.nowBoardInfo, "Detected position");
+      // Populate match game select
+      els.matchGameSelect.innerHTML = mode.candidates.map((id, idx) => {
+        const game = model.games.find(g => g.id === id);
+        return `<option value="${id}">Game ${idx + 1} (Page ${game?.page ?? "?"})</option>`;
+      }).join("");
+      break;
+      
+    case "reach":
+      // All three boards, reach actions
+      toggleHidden(els.boardSlotBefore, true);
+      toggleHidden(els.boardSlotAfter, true);
+      toggleHidden(els.boardRowReach, true);
+      setText(els.beforeBoardInfo, "Starting position");
+      setText(els.nowBoardInfo, "Enter moves here");
+      // Update reach indicator
+      if (mode.reached) {
+        els.boardRowReachIndicator.textContent = "✓ Position reached!";
+        els.boardRowReachIndicator.classList.add("reached");
+        els.boardRowReachIndicator.classList.remove("not-reached");
+      } else {
+        els.boardRowReachIndicator.textContent = "Target position";
+        els.boardRowReachIndicator.classList.remove("reached");
+        els.boardRowReachIndicator.classList.add("not-reached");
+      }
+      setText(els.boardRowReachStatus, `Moves: ${mode.moves}`);
+      els.btnRowUndo.disabled = mode.moves === 0;
+      els.btnRowDone.disabled = mode.moves === 0;
+      break;
+      
+    case "analysis":
+      // Only "Now" board for analysis, analysis actions
+      toggleHidden(els.boardSlotBefore, false);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowAnalysis, true);
+      setText(els.nowBoardInfo, "");
+      break;
+      
+    case "howReach":
+      // Only "Now" board, how-to-reach actions
+      toggleHidden(els.boardSlotBefore, false);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowHowReach, true);
+      setText(els.nowBoardInfo, "How to reach?");
+      break;
+  }
+};
+
 export const render = (model: Model, dispatch: Dispatch): void => {
   const hasPdf = Boolean(model.pdf.id);
   toggleHidden(els.noPdfMessage, !hasPdf);
@@ -282,4 +418,5 @@ export const render = (model: Model, dispatch: Dispatch): void => {
   renderDiagramOverlay(model, dispatch);
   renderAnalysis(model, dispatch);
   renderReachModal(model);
+  renderBoardRow(model, dispatch);
 };

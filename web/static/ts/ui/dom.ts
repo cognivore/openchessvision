@@ -84,6 +84,47 @@ const initEls = () => ({
     reachBtnReset: byId<HTMLButtonElement>("reach-btn-reset"),
     reachBtnDone: byId<HTMLButtonElement>("reach-btn-done"),
     reachBtnCancel: byId<HTMLButtonElement>("reach-btn-cancel"),
+    // Board row elements
+    boardRow: byId<HTMLDivElement>("board-row"),
+    boardSlotBefore: byId<HTMLDivElement>("board-slot-before"),
+    boardSlotNow: byId<HTMLDivElement>("board-slot-now"),
+    boardSlotAfter: byId<HTMLDivElement>("board-slot-after"),
+    beforeBoard: byId<HTMLDivElement>("before-board"),
+    nowBoard: byId<HTMLDivElement>("now-board"),
+    afterBoard: byId<HTMLDivElement>("after-board"),
+    beforeBoardInfo: byId<HTMLDivElement>("before-board-info"),
+    nowBoardInfo: byId<HTMLDivElement>("now-board-info"),
+    afterBoardInfo: byId<HTMLDivElement>("after-board-info"),
+    boardRowActions: byId<HTMLDivElement>("board-row-actions"),
+    boardRowReachIndicator: byId<HTMLSpanElement>("board-row-reach-indicator"),
+    // Board row action groups
+    boardRowConfirm: byId<HTMLDivElement>("board-row-confirm"),
+    boardRowMatch: byId<HTMLDivElement>("board-row-match"),
+    boardRowReach: byId<HTMLDivElement>("board-row-reach"),
+    boardRowAnalysis: byId<HTMLDivElement>("board-row-analysis"),
+    boardRowHowReach: byId<HTMLDivElement>("board-row-how-reach"),
+    // Board row buttons - confirm
+    btnRowConfirm: byId<HTMLButtonElement>("btn-row-confirm"),
+    btnRowEdit: byId<HTMLButtonElement>("btn-row-edit"),
+    // Board row buttons - match
+    matchGameSelect: byId<HTMLSelectElement>("match-game-select"),
+    btnRowContinue: byId<HTMLButtonElement>("btn-row-continue"),
+    btnRowNewGame: byId<HTMLButtonElement>("btn-row-new-game"),
+    // Board row buttons - reach
+    boardRowReachStatus: byId<HTMLSpanElement>("board-row-reach-status"),
+    btnRowUndo: byId<HTMLButtonElement>("btn-row-undo"),
+    btnRowReset: byId<HTMLButtonElement>("btn-row-reset"),
+    btnRowDone: byId<HTMLButtonElement>("btn-row-done"),
+    btnRowCancel: byId<HTMLButtonElement>("btn-row-cancel"),
+    // Board row buttons - analysis
+    btnRowAnalyseWhite: byId<HTMLButtonElement>("btn-row-analyse-white"),
+    btnRowAnalyseBlack: byId<HTMLButtonElement>("btn-row-analyse-black"),
+    btnRowCopyFen: byId<HTMLButtonElement>("btn-row-copy-fen"),
+    btnRowCopyPgn: byId<HTMLButtonElement>("btn-row-copy-pgn"),
+    btnRowClose: byId<HTMLButtonElement>("btn-row-close"),
+    // Board row buttons - how to reach
+    btnRowOtb: byId<HTMLButtonElement>("btn-row-otb"),
+    btnRowManual: byId<HTMLButtonElement>("btn-row-manual"),
 });
 
 // Proxy that lazily initializes els on first access

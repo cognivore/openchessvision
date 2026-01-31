@@ -111,6 +111,49 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
         backdrop.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
     }
 
+    // Board row bindings - Confirm mode
+    els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
+
+    // Board row bindings - Match mode
+    els.btnRowContinue.addEventListener("click", () => dispatch({ tag: "ContinueSelectedGame" }));
+    els.btnRowNewGame.addEventListener("click", () => dispatch({ tag: "StartNewGame" }));
+    els.matchGameSelect.addEventListener("change", () => {
+        const selectedId = els.matchGameSelect.value;
+        if (selectedId) {
+            dispatch({ tag: "MatchGameSelected", gameId: selectedId as any });
+        }
+    });
+
+    // Board row bindings - Reach mode
+    els.btnRowUndo.addEventListener("click", () => dispatch({ tag: "ReachUndo" }));
+    els.btnRowReset.addEventListener("click", () => dispatch({ tag: "ReachReset" }));
+    els.btnRowDone.addEventListener("click", () => dispatch({ tag: "ReachDone" }));
+    els.btnRowCancel.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
+
+    // Board row bindings - Analysis mode
+    els.btnRowAnalyseWhite.addEventListener("click", () => {
+        const model = getModel();
+        const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
+        if (active) {
+            dispatch({ tag: "AnalysisStarted", gameId: active, turn: "w" });
+        }
+    });
+    els.btnRowAnalyseBlack.addEventListener("click", () => {
+        const model = getModel();
+        const active = model.workflow.tag === "VIEWING" ? model.workflow.activeGameId : null;
+        if (active) {
+            dispatch({ tag: "AnalysisStarted", gameId: active, turn: "b" });
+        }
+    });
+    els.btnRowCopyFen.addEventListener("click", () => dispatch({ tag: "CopyFen" }));
+    els.btnRowCopyPgn.addEventListener("click", () => dispatch({ tag: "CopyPgn" }));
+    els.btnRowClose.addEventListener("click", () => dispatch({ tag: "DiagramActivated", gameId: null }));
+
+    // Board row bindings - How to reach mode
+    els.btnRowOtb.addEventListener("click", () => dispatch({ tag: "ReachStartOtb" }));
+    els.btnRowManual.addEventListener("click", () => dispatch({ tag: "ReachStartManual" }))
+
     document.addEventListener("keydown", (event) => {
         const target = event.target as HTMLElement | null;
         if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {

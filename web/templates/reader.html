@@ -55,6 +55,77 @@
                     <span id="zoom-value">100%</span>
                 </div>
 
+                <!-- Board Row: Up to 3 boards for editing/analysis -->
+                <div id="board-row" class="board-row hidden">
+                    <div class="board-row-content">
+                        <!-- Before board (optional) -->
+                        <div id="board-slot-before" class="board-slot hidden">
+                            <div class="board-slot-label">Before</div>
+                            <div id="before-board" class="slot-board"></div>
+                            <div class="board-slot-info" id="before-board-info"></div>
+                        </div>
+
+                        <!-- Now board (main, always shown when row is visible) -->
+                        <div id="board-slot-now" class="board-slot board-slot-main">
+                            <div class="board-slot-label">Now</div>
+                            <div id="now-board" class="slot-board"></div>
+                            <div class="board-slot-info" id="now-board-info"></div>
+                        </div>
+
+                        <!-- After board (optional) -->
+                        <div id="board-slot-after" class="board-slot hidden">
+                            <div class="board-slot-label">After</div>
+                            <div id="after-board" class="slot-board"></div>
+                            <div class="board-slot-info" id="after-board-info">
+                                <span class="reach-indicator" id="board-row-reach-indicator"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Board row actions -->
+                    <div class="board-row-actions" id="board-row-actions">
+                        <!-- Confirm mode actions -->
+                        <div id="board-row-confirm" class="board-row-action-group hidden">
+                            <span class="action-label">Does this position look correct?</span>
+                            <button id="btn-row-confirm" class="btn-primary btn-small">Looks Correct</button>
+                            <button id="btn-row-edit" class="btn-secondary btn-small">Edit Pieces</button>
+                        </div>
+
+                        <!-- Match existing mode actions -->
+                        <div id="board-row-match" class="board-row-action-group hidden">
+                            <span class="action-label">Continue from existing game?</span>
+                            <select id="match-game-select" class="match-game-select"></select>
+                            <button id="btn-row-continue" class="btn-primary btn-small">Continue</button>
+                            <button id="btn-row-new-game" class="btn-secondary btn-small">New Game</button>
+                        </div>
+
+                        <!-- Reaching mode actions -->
+                        <div id="board-row-reach" class="board-row-action-group hidden">
+                            <span class="action-label" id="board-row-reach-status">Moves: 0</span>
+                            <button id="btn-row-undo" class="btn-secondary btn-small" disabled>↩ Undo</button>
+                            <button id="btn-row-reset" class="btn-secondary btn-small">↺ Reset</button>
+                            <button id="btn-row-done" class="btn-primary btn-small" disabled>✓ Done</button>
+                            <button id="btn-row-cancel" class="btn-secondary btn-small">Cancel</button>
+                        </div>
+
+                        <!-- Analysis mode actions -->
+                        <div id="board-row-analysis" class="board-row-action-group hidden">
+                            <button id="btn-row-analyse-white" class="btn-primary btn-small">🧠♔ White</button>
+                            <button id="btn-row-analyse-black" class="btn-primary btn-small">🧠♚ Black</button>
+                            <button id="btn-row-copy-fen" class="btn-secondary btn-small">📋 FEN</button>
+                            <button id="btn-row-copy-pgn" class="btn-secondary btn-small">📋 PGN</button>
+                            <button id="btn-row-close" class="btn-secondary btn-small">✕ Close</button>
+                        </div>
+
+                        <!-- How to reach actions (shown after confirm) -->
+                        <div id="board-row-how-reach" class="board-row-action-group hidden">
+                            <span class="action-label">How to reach this position?</span>
+                            <button id="btn-row-otb" class="btn-primary btn-small">Play OTB</button>
+                            <button id="btn-row-manual" class="btn-secondary btn-small">Enter Moves</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="pdf-viewport" id="pdf-viewport">
                     <div class="pdf-page-container" id="pdf-page-container">
                         <canvas id="pdf-canvas"></canvas>

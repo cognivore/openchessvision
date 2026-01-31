@@ -31,6 +31,7 @@ export type Msg =
   | { tag: "PiecesConfirmed"; placement: FenPlacement }
   | { tag: "EditPieces" }
   | { tag: "SelectCandidate"; gameId: GameId }
+  | { tag: "MatchGameSelected"; gameId: GameId }
   | { tag: "ContinueSelectedGame" }
   | { tag: "StartNewGame" }
   | { tag: "ReachStartManual" }

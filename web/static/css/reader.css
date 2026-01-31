@@ -335,6 +335,160 @@ button:disabled {
     min-width: 40px;
 }
 
+/* =============================================================================
+   Board Row - Multi-board display for editing/analysis
+   ============================================================================= */
+
+.board-row {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 320px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+}
+
+.board-row.hidden {
+    display: none;
+}
+
+.board-row-content {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.board-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.board-slot.hidden {
+    display: none;
+}
+
+.board-slot-main {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 12px rgba(212, 168, 67, 0.2);
+}
+
+.board-slot-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.board-slot-main .board-slot-label {
+    color: var(--accent-gold);
+}
+
+.slot-board {
+    width: 200px;
+    height: 200px;
+}
+
+.board-slot-main .slot-board {
+    width: 220px;
+    height: 220px;
+}
+
+.board-slot-info {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    min-height: 1.25em;
+}
+
+/* Board row actions */
+.board-row-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.board-row-action-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.board-row-action-group.hidden {
+    display: none;
+}
+
+.board-row-action-group .action-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-right: 0.5rem;
+}
+
+.match-game-select {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    max-width: 200px;
+}
+
+.match-game-select:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+}
+
+/* Board row reach indicator */
+#board-row-reach-indicator {
+    font-weight: 600;
+}
+
+#board-row-reach-indicator.reached {
+    color: var(--accent-green);
+}
+
+#board-row-reach-indicator.not-reached {
+    color: var(--text-secondary);
+}
+
+/* Piece glow effects for board row boards */
+.board-row .slot-board img[src*="wK"],
+.board-row .slot-board img[src*="wQ"],
+.board-row .slot-board img[src*="wR"],
+.board-row .slot-board img[src*="wB"],
+.board-row .slot-board img[src*="wN"],
+.board-row .slot-board img[src*="wP"] {
+    filter: drop-shadow(0 0 4px var(--accent-green))
+            drop-shadow(0 0 8px rgba(57, 255, 20, 0.6));
+}
+
+.board-row .slot-board img[src*="bK"],
+.board-row .slot-board img[src*="bQ"],
+.board-row .slot-board img[src*="bR"],
+.board-row .slot-board img[src*="bB"],
+.board-row .slot-board img[src*="bN"],
+.board-row .slot-board img[src*="bP"] {
+    filter: drop-shadow(0 0 4px var(--accent-purple))
+            drop-shadow(0 0 8px rgba(191, 0, 255, 0.6));
+}
+
 /* PDF Viewport */
 .pdf-viewport {
     flex: 1;
