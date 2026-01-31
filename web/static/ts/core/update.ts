@@ -412,7 +412,7 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         workflow: { tag: "REACHING", session },
         isDirty: true,
       };
-      return [nextModel, [{ tag: "OPEN_REACH_MODAL" }, { tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
+      return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
     }
     case "StartNewGame": {
       if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -430,7 +430,7 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         workflow: { tag: "REACHING", session },
         isDirty: true,
       };
-      return [nextModel, [{ tag: "OPEN_REACH_MODAL" }, { tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
+      return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
     }
     case "ReachStartManual":
       if (model.workflow.tag !== "REACHING") {

@@ -166,7 +166,7 @@ export const createRuntime = (initial: Model) => {
   const syncBoardRow = (): void => {
     const workflow = model.workflow;
     const modeKey = workflow.tag;
-    
+
     // Destroy boards if mode changes or workflow closes
     if (modeKey === "NO_PDF" || modeKey === "VIEWING") {
       if (resources.boardRow.currentMode !== null) {
@@ -177,16 +177,16 @@ export const createRuntime = (initial: Model) => {
       }
       return;
     }
-    
+
     // Mode changed - rebuild boards
     if (resources.boardRow.currentMode !== modeKey) {
       resources.boardRow.before?.destroy();
       resources.boardRow.now?.destroy();
       resources.boardRow.after?.destroy();
       resources.boardRow.nowGame = null;
-      
+
       const pieceTheme = "/static/vendor/img/chesspieces/wikipedia/{piece}.png";
-      
+
       switch (workflow.tag) {
         case "PENDING_CONFIRM": {
           // Single board showing detected position
@@ -200,7 +200,7 @@ export const createRuntime = (initial: Model) => {
           resources.boardRow.after = null;
           break;
         }
-        
+
         case "MATCH_EXISTING": {
           // Before (selected game) + Now (detected)
           const selectedId = workflow.selected;
@@ -222,11 +222,11 @@ export const createRuntime = (initial: Model) => {
           resources.boardRow.after = null;
           break;
         }
-        
+
         case "REACHING": {
           const session = workflow.session;
           resources.boardRow.nowGame = new Chess(session.startFen);
-          
+
           // Before (start position)
           resources.boardRow.before = createBoard("before-board", {
             position: String(session.startFen).split(" ")[0],
@@ -234,7 +234,7 @@ export const createRuntime = (initial: Model) => {
             showNotation: false,
             pieceTheme,
           });
-          
+
           // Now (interactive entry board)
           const onDragStart = (_source: string, piece: string) => {
             if (!resources.boardRow.nowGame) return false;
@@ -256,7 +256,7 @@ export const createRuntime = (initial: Model) => {
             if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
             resources.boardRow.now.position(resources.boardRow.nowGame.fen());
           };
-          
+
           resources.boardRow.now = createBoard("now-board", {
             position: String(session.startFen).split(" ")[0],
             draggable: true,
@@ -266,7 +266,7 @@ export const createRuntime = (initial: Model) => {
             onDrop,
             onSnapEnd,
           });
-          
+
           // After (target position)
           resources.boardRow.after = createBoard("after-board", {
             position: String(session.targetFen),
@@ -276,12 +276,12 @@ export const createRuntime = (initial: Model) => {
           });
           break;
         }
-        
+
         case "ANALYSIS": {
           const game = model.games.find(g => g.id === workflow.activeGameId);
           const tree = model.analyses[workflow.activeGameId];
           let currentFen = game?.fen ?? "start";
-          
+
           // Get FEN at current cursor position
           if (tree && workflow.cursor.length > 0) {
             let node = tree.root;
@@ -295,9 +295,9 @@ export const createRuntime = (initial: Model) => {
             }
             currentFen = node.fen.split(" ")[0];
           }
-          
+
           resources.boardRow.nowGame = new Chess(currentFen);
-          
+
           const onDrop = (source: string, target: string) => {
             if (!resources.boardRow.nowGame) return "snapback";
             const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
@@ -309,7 +309,7 @@ export const createRuntime = (initial: Model) => {
             if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
             resources.boardRow.now.position(resources.boardRow.nowGame.fen());
           };
-          
+
           resources.boardRow.now = createBoard("now-board", {
             position: currentFen,
             draggable: true,
@@ -323,9 +323,9 @@ export const createRuntime = (initial: Model) => {
           break;
         }
       }
-      
+
       resources.boardRow.currentMode = modeKey;
-      
+
       // Trigger resize after a short delay to ensure DOM is ready
       setTimeout(() => {
         resources.boardRow.before?.resize();
@@ -334,7 +334,7 @@ export const createRuntime = (initial: Model) => {
       }, 50);
       return;
     }
-    
+
     // Mode hasn't changed - just update positions if needed
     switch (workflow.tag) {
       case "REACHING": {
@@ -346,12 +346,12 @@ export const createRuntime = (initial: Model) => {
         resources.boardRow.now?.position(String(session.currentFen));
         break;
       }
-      
+
       case "ANALYSIS": {
         const tree = model.analyses[workflow.activeGameId];
         const game = model.games.find(g => g.id === workflow.activeGameId);
         let currentFen = game?.fen ?? "start";
-        
+
         if (tree && workflow.cursor.length > 0) {
           let node = tree.root;
           for (const san of workflow.cursor) {
@@ -364,14 +364,14 @@ export const createRuntime = (initial: Model) => {
           }
           currentFen = node.fen;
         }
-        
+
         resources.boardRow.now?.position(currentFen.split(" ")[0]);
         if (resources.boardRow.nowGame) {
           resources.boardRow.nowGame = new Chess(currentFen);
         }
         break;
       }
-      
+
       case "MATCH_EXISTING": {
         // Update before board if selection changed
         const selectedId = workflow.selected;
@@ -627,71 +627,7 @@ export const createRuntime = (initial: Model) => {
           dispatch({ tag: "PiecesConfirmed", placement });
         }
         return;
-      case "OPEN_REACH_MODAL": {
-        const session =
-          model.workflow.tag === "REACHING" ? model.workflow.session : null;
-        if (!session) return;
-        resources.reachGame = new Chess(session.startFen);
-        const onDragStart = (_source: string, piece: string) => {
-          if (!resources.reachGame) return false;
-          if (resources.reachGame.game_over()) return false;
-          const turn = resources.reachGame.turn();
-          if ((turn === "w" && piece.startsWith("b")) || (turn === "b" && piece.startsWith("w"))) {
-            return false;
-          }
-          return true;
-        };
-        const onDrop = (source: string, target: string) => {
-          if (!resources.reachGame) return "snapback";
-          const move = resources.reachGame.move({ from: source, to: target, promotion: "q" });
-          if (!move) return "snapback";
-          dispatch({ tag: "ReachMoveMade", san: asSan(move.san), fen: asFenFull(resources.reachGame.fen()) });
-          return undefined;
-        };
-        const onSnapEnd = () => {
-          if (!resources.reachGame || !resources.reachBoards.entry) return;
-          resources.reachBoards.entry.position(resources.reachGame.fen());
-        };
-        resources.reachBoards.start?.destroy();
-        resources.reachBoards.entry?.destroy();
-        resources.reachBoards.target?.destroy();
-        const startPlacement = String(session.startFen).split(" ")[0];
-        const targetPlacement = String(session.targetFen);
-        resources.reachBoards.start = createBoard("reach-start-board", {
-          position: startPlacement,
-          draggable: false,
-          showNotation: false,
-          pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png",
-        });
-        resources.reachBoards.entry = createBoard("reach-entry-board", {
-          position: startPlacement,
-          draggable: true,
-          showNotation: true,
-          pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png",
-          onDragStart,
-          onDrop,
-          onSnapEnd,
-        });
-        resources.reachBoards.target = createBoard("reach-target-board", {
-          position: targetPlacement,
-          draggable: false,
-          showNotation: false,
-          pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png",
-        });
-        els.reachStartLabel.textContent = session.baseAnalysisId ? "Continue from game" : "Starting position";
-        window.setTimeout(() => {
-          resources.reachBoards.start?.resize();
-          resources.reachBoards.entry?.resize();
-          resources.reachBoards.target?.resize();
-        }, 50);
-        return;
-      }
-      case "CLOSE_REACH_MODAL":
-        resources.reachBoards.start?.destroy();
-        resources.reachBoards.entry?.destroy();
-        resources.reachBoards.target?.destroy();
-        resources.reachBoards = { start: null, entry: null, target: null };
-        return;
+      // OPEN_REACH_MODAL and CLOSE_REACH_MODAL removed - board row handles reach mode now
       case "REACH_SET_MOVES":
         dispatch({ tag: "ReachTargetResolved", moves: cmd.moves, finalFen: cmd.finalFen, turn: null });
         return;

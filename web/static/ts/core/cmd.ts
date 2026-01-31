@@ -25,8 +25,6 @@ export type Cmd =
   | { tag: "BOARD_STATUS_POLL_START"; everyMs: number }
   | { tag: "BOARD_STATUS_POLL_STOP" }
   | { tag: "CLIPBOARD_WRITE"; text: string }
-  | { tag: "OPEN_REACH_MODAL" }
-  | { tag: "CLOSE_REACH_MODAL" }
   | { tag: "CHESSBOARD_READ_PREVIEW" }
   | { tag: "SCHEDULE_SAVE"; delayMs: number }
   | { tag: "NO_OP" }

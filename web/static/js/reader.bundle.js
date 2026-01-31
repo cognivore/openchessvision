@@ -678,7 +678,7 @@
           workflow: { tag: "REACHING", session },
           isDirty: true
         };
-        return [nextModel, [{ tag: "OPEN_REACH_MODAL" }, { tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
+        return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
       }
       case "StartNewGame": {
         if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -696,7 +696,7 @@
           workflow: { tag: "REACHING", session },
           isDirty: true
         };
-        return [nextModel, [{ tag: "OPEN_REACH_MODAL" }, { tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
+        return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
       }
       case "ReachStartManual":
         if (model.workflow.tag !== "REACHING") {
@@ -1665,21 +1665,7 @@
     });
   };
   var renderReachModal = (model) => {
-    toggleHidden(els.reachModal, model.workflow.tag === "REACHING");
-    if (model.workflow.tag !== "REACHING") {
-      return;
-    }
-    const session = model.workflow.session;
-    els.reachStatus.textContent = `Moves: ${session.moves.length}`;
-    const currentPlacement = String(session.currentFen).split(" ")[0];
-    els.reachIndicator.textContent = currentPlacement === String(session.targetFen) ? "\u2713 Reached" : "\u2026";
-    els.reachBtnUndo.disabled = session.moves.length === 0;
-    els.reachBtnDone.disabled = session.moves.length === 0;
-    els.reachMoveList.innerHTML = session.moves.map((move, idx) => {
-      const moveNumber = Math.floor(idx / 2) + 1;
-      const prefix = idx % 2 === 0 ? `${moveNumber}.` : "";
-      return `<div class="reach-move">${prefix} ${move}</div>`;
-    }).join("");
+    toggleHidden(els.reachModal, false);
   };
   var getBoardRowMode = (model) => {
     switch (model.workflow.tag) {
@@ -3257,70 +3243,7 @@
             dispatch({ tag: "PiecesConfirmed", placement });
           }
           return;
-        case "OPEN_REACH_MODAL": {
-          const session = model.workflow.tag === "REACHING" ? model.workflow.session : null;
-          if (!session) return;
-          resources.reachGame = new Chess(session.startFen);
-          const onDragStart = (_source, piece) => {
-            if (!resources.reachGame) return false;
-            if (resources.reachGame.game_over()) return false;
-            const turn = resources.reachGame.turn();
-            if (turn === "w" && piece.startsWith("b") || turn === "b" && piece.startsWith("w")) {
-              return false;
-            }
-            return true;
-          };
-          const onDrop = (source, target) => {
-            if (!resources.reachGame) return "snapback";
-            const move = resources.reachGame.move({ from: source, to: target, promotion: "q" });
-            if (!move) return "snapback";
-            dispatch({ tag: "ReachMoveMade", san: asSan(move.san), fen: asFenFull(resources.reachGame.fen()) });
-            return void 0;
-          };
-          const onSnapEnd = () => {
-            if (!resources.reachGame || !resources.reachBoards.entry) return;
-            resources.reachBoards.entry.position(resources.reachGame.fen());
-          };
-          resources.reachBoards.start?.destroy();
-          resources.reachBoards.entry?.destroy();
-          resources.reachBoards.target?.destroy();
-          const startPlacement = String(session.startFen).split(" ")[0];
-          const targetPlacement = String(session.targetFen);
-          resources.reachBoards.start = createBoard("reach-start-board", {
-            position: startPlacement,
-            draggable: false,
-            showNotation: false,
-            pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png"
-          });
-          resources.reachBoards.entry = createBoard("reach-entry-board", {
-            position: startPlacement,
-            draggable: true,
-            showNotation: true,
-            pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png",
-            onDragStart,
-            onDrop,
-            onSnapEnd
-          });
-          resources.reachBoards.target = createBoard("reach-target-board", {
-            position: targetPlacement,
-            draggable: false,
-            showNotation: false,
-            pieceTheme: "/static/vendor/img/chesspieces/wikipedia/{piece}.png"
-          });
-          els.reachStartLabel.textContent = session.baseAnalysisId ? "Continue from game" : "Starting position";
-          window.setTimeout(() => {
-            resources.reachBoards.start?.resize();
-            resources.reachBoards.entry?.resize();
-            resources.reachBoards.target?.resize();
-          }, 50);
-          return;
-        }
-        case "CLOSE_REACH_MODAL":
-          resources.reachBoards.start?.destroy();
-          resources.reachBoards.entry?.destroy();
-          resources.reachBoards.target?.destroy();
-          resources.reachBoards = { start: null, entry: null, target: null };
-          return;
+        // OPEN_REACH_MODAL and CLOSE_REACH_MODAL removed - board row handles reach mode now
         case "REACH_SET_MOVES":
           dispatch({ tag: "ReachTargetResolved", moves: cmd.moves, finalFen: cmd.finalFen, turn: null });
           return;

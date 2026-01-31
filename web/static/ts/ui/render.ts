@@ -7,7 +7,7 @@ import { asSan } from "../domain/chess/san";
 import { clearOverlay, renderOverlay } from "./adapters/overlay";
 
 // Board row mode determines which boards and actions to show
-type BoardRowMode = 
+type BoardRowMode =
   | { tag: "hidden" }
   | { tag: "confirm"; fen: string }
   | { tag: "match"; beforeFen: string | null; nowFen: string; candidates: ReadonlyArray<GameId> }
@@ -227,23 +227,8 @@ const renderAnalysis = (model: Model, dispatch: Dispatch): void => {
 };
 
 const renderReachModal = (model: Model): void => {
-  toggleHidden(els.reachModal, model.workflow.tag === "REACHING");
-  if (model.workflow.tag !== "REACHING") {
-    return;
-  }
-  const session = model.workflow.session;
-  els.reachStatus.textContent = `Moves: ${session.moves.length}`;
-  const currentPlacement = String(session.currentFen).split(" ")[0];
-  els.reachIndicator.textContent = currentPlacement === String(session.targetFen) ? "✓ Reached" : "…";
-  els.reachBtnUndo.disabled = session.moves.length === 0;
-  els.reachBtnDone.disabled = session.moves.length === 0;
-  els.reachMoveList.innerHTML = session.moves
-    .map((move, idx) => {
-      const moveNumber = Math.floor(idx / 2) + 1;
-      const prefix = idx % 2 === 0 ? `${moveNumber}.` : "";
-      return `<div class="reach-move">${prefix} ${move}</div>`;
-    })
-    .join("");
+  // Always hide the modal - we use the board row instead
+  toggleHidden(els.reachModal, false);
 };
 
 const getBoardRowMode = (model: Model): BoardRowMode => {
@@ -302,23 +287,23 @@ const getBoardRowMode = (model: Model): BoardRowMode => {
 
 const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
   const mode = getBoardRowMode(model);
-  
+
   // Hide all action groups first
   toggleHidden(els.boardRowConfirm, false);
   toggleHidden(els.boardRowMatch, false);
   toggleHidden(els.boardRowReach, false);
   toggleHidden(els.boardRowAnalysis, false);
   toggleHidden(els.boardRowHowReach, false);
-  
+
   // Hide board row if no mode
   if (mode.tag === "hidden") {
     els.boardRow.classList.add("hidden");
     return;
   }
-  
+
   // Show board row
   els.boardRow.classList.remove("hidden");
-  
+
   // Configure slots based on mode
   switch (mode.tag) {
     case "confirm":
@@ -328,7 +313,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
       toggleHidden(els.boardRowConfirm, true);
       setText(els.nowBoardInfo, "Detected position");
       break;
-      
+
     case "match":
       // "Before" (selected game) + "Now" (detected), match actions
       toggleHidden(els.boardSlotBefore, mode.beforeFen !== null);
@@ -342,7 +327,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
         return `<option value="${id}">Game ${idx + 1} (Page ${game?.page ?? "?"})</option>`;
       }).join("");
       break;
-      
+
     case "reach":
       // All three boards, reach actions
       toggleHidden(els.boardSlotBefore, true);
@@ -364,7 +349,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
       els.btnRowUndo.disabled = mode.moves === 0;
       els.btnRowDone.disabled = mode.moves === 0;
       break;
-      
+
     case "analysis":
       // Only "Now" board for analysis, analysis actions
       toggleHidden(els.boardSlotBefore, false);
@@ -372,7 +357,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
       toggleHidden(els.boardRowAnalysis, true);
       setText(els.nowBoardInfo, "");
       break;
-      
+
     case "howReach":
       // Only "Now" board, how-to-reach actions
       toggleHidden(els.boardSlotBefore, false);
