@@ -90,15 +90,13 @@ const renderPositions = (model: Model, dispatch: Dispatch): void => {
   });
 };
 
-const renderWorkflowPanels = (model: Model): void => {
-  toggleHidden(els.confirmPanel, model.workflow.tag === "PENDING_CONFIRM");
-  toggleHidden(els.gameMatchPanel, model.workflow.tag === "MATCH_EXISTING");
+const renderWorkflowPanels = (_model: Model): void => {
+  // All workflow panels moved to board row - hide sidebar panels
+  toggleHidden(els.confirmPanel, false);
+  toggleHidden(els.gameMatchPanel, false);
   toggleHidden(els.reachPanel, false);
   toggleHidden(els.otbPanel, false);
   toggleHidden(els.ocrPanel, false);
-  if (model.workflow.tag === "MATCH_EXISTING") {
-    els.btnContinueGame.disabled = model.workflow.candidates.length === 0;
-  }
 };
 
 const renderOverlayBoards = (model: Model): void => {

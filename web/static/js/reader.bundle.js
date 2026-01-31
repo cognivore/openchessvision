@@ -1544,15 +1544,12 @@
       }, 10);
     });
   };
-  var renderWorkflowPanels = (model) => {
-    toggleHidden(els.confirmPanel, model.workflow.tag === "PENDING_CONFIRM");
-    toggleHidden(els.gameMatchPanel, model.workflow.tag === "MATCH_EXISTING");
+  var renderWorkflowPanels = (_model) => {
+    toggleHidden(els.confirmPanel, false);
+    toggleHidden(els.gameMatchPanel, false);
     toggleHidden(els.reachPanel, false);
     toggleHidden(els.otbPanel, false);
     toggleHidden(els.ocrPanel, false);
-    if (model.workflow.tag === "MATCH_EXISTING") {
-      els.btnContinueGame.disabled = model.workflow.candidates.length === 0;
-    }
   };
   var renderOverlayBoards = (model) => {
     const activeGame = getActiveGame(model);
