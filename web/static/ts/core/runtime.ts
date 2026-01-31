@@ -165,10 +165,12 @@ export const createRuntime = (initial: Model) => {
 
   const syncBoardRow = (): void => {
     const workflow = model.workflow;
-    const modeKey = workflow.tag;
+    const isEditing = model.ui.editingPosition;
+    // Include editing state in mode key so board is recreated when editing changes
+    const modeKey = workflow.tag + (isEditing ? "-edit" : "");
 
     // Destroy boards if mode changes or workflow closes
-    if (modeKey === "NO_PDF" || modeKey === "VIEWING") {
+    if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {
       if (resources.boardRow.currentMode !== null) {
         resources.boardRow.before?.destroy();
         resources.boardRow.now?.destroy();
@@ -189,10 +191,12 @@ export const createRuntime = (initial: Model) => {
 
       switch (workflow.tag) {
         case "PENDING_CONFIRM": {
-          // Single board showing detected position
+          // Single board showing detected position - editable if editing mode
           resources.boardRow.now = createBoard("now-board", {
             position: String(workflow.pending.targetFen),
-            draggable: false,
+            draggable: isEditing,
+            dropOffBoard: isEditing ? "trash" : "snapback",
+            sparePieces: isEditing,
             showNotation: false,
             pieceTheme,
           });
@@ -622,7 +626,12 @@ export const createRuntime = (initial: Model) => {
         }
         return;
       case "CHESSBOARD_READ_PREVIEW":
-        if (resources.previewBoard) {
+        // Read from board row's now board (used for piece editing confirmation)
+        if (resources.boardRow.now) {
+          const placement = getBoardFen(resources.boardRow.now);
+          dispatch({ tag: "PiecesConfirmed", placement });
+        } else if (resources.previewBoard) {
+          // Fallback to preview board (overlay)
           const placement = getBoardFen(resources.previewBoard);
           dispatch({ tag: "PiecesConfirmed", placement });
         }

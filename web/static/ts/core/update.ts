@@ -370,12 +370,27 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
           candidates: analyzedCandidates,
           selected: analyzedCandidates[0] ?? null,
         },
+        ui: { ...model.ui, editingPosition: false },
         isDirty: true,
       };
       return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
     }
     case "EditPieces":
-      return [withStatus(model, "Edit pieces using the palette, then confirm"), noCmd];
+      return [
+        {
+          ...model,
+          ui: { ...model.ui, editingPosition: true, statusMessage: "Drag pieces to edit, then save" },
+        },
+        noCmd,
+      ];
+    case "CancelEdit":
+      return [
+        {
+          ...model,
+          ui: { ...model.ui, editingPosition: false, statusMessage: "Edit cancelled" },
+        },
+        noCmd,
+      ];
     case "SelectCandidate":
     case "MatchGameSelected": {
       if (model.workflow.tag !== "MATCH_EXISTING") {

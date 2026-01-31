@@ -7,9 +7,10 @@ import { asSan } from "../domain/chess/san";
 import { clearOverlay, renderOverlay } from "./adapters/overlay";
 
 // Board row mode determines which boards and actions to show
-type BoardRowMode =
+type BoardRowMode = 
   | { tag: "hidden" }
   | { tag: "confirm"; fen: string }
+  | { tag: "edit"; fen: string }
   | { tag: "match"; beforeFen: string | null; nowFen: string; candidates: ReadonlyArray<GameId> }
   | { tag: "reach"; beforeFen: string; nowFen: string; afterFen: string; moves: number; reached: boolean }
   | { tag: "analysis"; fen: string }
@@ -237,6 +238,10 @@ const getBoardRowMode = (model: Model): BoardRowMode => {
       // In viewing mode, we don't show the board row (transparent overlay on PDF instead)
       return { tag: "hidden" };
     case "PENDING_CONFIRM":
+      // Show edit mode if editing, otherwise confirm mode
+      if (model.ui.editingPosition) {
+        return { tag: "edit", fen: String(model.workflow.pending.targetFen) };
+      }
       return { tag: "confirm", fen: String(model.workflow.pending.targetFen) };
     case "MATCH_EXISTING": {
       const selectedId = model.workflow.selected;
@@ -288,6 +293,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
 
   // Hide all action groups first
   toggleHidden(els.boardRowConfirm, false);
+  toggleHidden(els.boardRowEdit, false);
   toggleHidden(els.boardRowMatch, false);
   toggleHidden(els.boardRowReach, false);
   toggleHidden(els.boardRowAnalysis, false);
@@ -310,6 +316,14 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
       toggleHidden(els.boardSlotAfter, false);
       toggleHidden(els.boardRowConfirm, true);
       setText(els.nowBoardInfo, "Detected position");
+      break;
+
+    case "edit":
+      // Only "Now" board (editable), save/cancel actions
+      toggleHidden(els.boardSlotBefore, false);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowEdit, true);
+      setText(els.nowBoardInfo, "Editing - drag pieces");
       break;
 
     case "match":

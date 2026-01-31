@@ -115,6 +115,10 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
     els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
     els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
 
+    // Board row bindings - Edit mode
+    els.btnRowSave.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowCancelEdit.addEventListener("click", () => dispatch({ tag: "CancelEdit" }));
+
     // Board row bindings - Match mode
     els.btnRowContinue.addEventListener("click", () => dispatch({ tag: "ContinueSelectedGame" }));
     els.btnRowNewGame.addEventListener("click", () => dispatch({ tag: "StartNewGame" }));

@@ -43,7 +43,8 @@
       ocrStatus: "",
       openingInputVisible: false,
       openingMovesInput: "",
-      selectedPiece: null
+      selectedPiece: null,
+      editingPosition: false
     },
     placementKeyIndex: {}
   };
@@ -636,12 +637,27 @@
             candidates: analyzedCandidates,
             selected: analyzedCandidates[0] ?? null
           },
+          ui: { ...model.ui, editingPosition: false },
           isDirty: true
         };
         return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
       }
       case "EditPieces":
-        return [withStatus(model, "Edit pieces using the palette, then confirm"), noCmd];
+        return [
+          {
+            ...model,
+            ui: { ...model.ui, editingPosition: true, statusMessage: "Drag pieces to edit, then save" }
+          },
+          noCmd
+        ];
+      case "CancelEdit":
+        return [
+          {
+            ...model,
+            ui: { ...model.ui, editingPosition: false, statusMessage: "Edit cancelled" }
+          },
+          noCmd
+        ];
       case "SelectCandidate":
       case "MatchGameSelected": {
         if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -1297,6 +1313,7 @@
     boardRowReachIndicator: byId("board-row-reach-indicator"),
     // Board row action groups
     boardRowConfirm: byId("board-row-confirm"),
+    boardRowEdit: byId("board-row-edit"),
     boardRowMatch: byId("board-row-match"),
     boardRowReach: byId("board-row-reach"),
     boardRowAnalysis: byId("board-row-analysis"),
@@ -1304,6 +1321,9 @@
     // Board row buttons - confirm
     btnRowConfirm: byId("btn-row-confirm"),
     btnRowEdit: byId("btn-row-edit"),
+    // Board row buttons - edit
+    btnRowSave: byId("btn-row-save"),
+    btnRowCancelEdit: byId("btn-row-cancel-edit"),
     // Board row buttons - match
     matchGameSelect: byId("match-game-select"),
     btnRowContinue: byId("btn-row-continue"),
@@ -1671,6 +1691,9 @@
       case "VIEWING":
         return { tag: "hidden" };
       case "PENDING_CONFIRM":
+        if (model.ui.editingPosition) {
+          return { tag: "edit", fen: String(model.workflow.pending.targetFen) };
+        }
         return { tag: "confirm", fen: String(model.workflow.pending.targetFen) };
       case "MATCH_EXISTING": {
         const selectedId = model.workflow.selected;
@@ -1717,6 +1740,7 @@
   var renderBoardRow = (model, dispatch) => {
     const mode = getBoardRowMode(model);
     toggleHidden(els.boardRowConfirm, false);
+    toggleHidden(els.boardRowEdit, false);
     toggleHidden(els.boardRowMatch, false);
     toggleHidden(els.boardRowReach, false);
     toggleHidden(els.boardRowAnalysis, false);
@@ -1732,6 +1756,12 @@
         toggleHidden(els.boardSlotAfter, false);
         toggleHidden(els.boardRowConfirm, true);
         setText(els.nowBoardInfo, "Detected position");
+        break;
+      case "edit":
+        toggleHidden(els.boardSlotBefore, false);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowEdit, true);
+        setText(els.nowBoardInfo, "Editing - drag pieces");
         break;
       case "match":
         toggleHidden(els.boardSlotBefore, mode.beforeFen !== null);
@@ -1926,6 +1956,8 @@
     }
     els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
     els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
+    els.btnRowSave.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowCancelEdit.addEventListener("click", () => dispatch({ tag: "CancelEdit" }));
     els.btnRowContinue.addEventListener("click", () => dispatch({ tag: "ContinueSelectedGame" }));
     els.btnRowNewGame.addEventListener("click", () => dispatch({ tag: "StartNewGame" }));
     els.matchGameSelect.addEventListener("change", () => {
@@ -2814,8 +2846,9 @@
     };
     const syncBoardRow = () => {
       const workflow = model.workflow;
-      const modeKey = workflow.tag;
-      if (modeKey === "NO_PDF" || modeKey === "VIEWING") {
+      const isEditing = model.ui.editingPosition;
+      const modeKey = workflow.tag + (isEditing ? "-edit" : "");
+      if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {
         if (resources.boardRow.currentMode !== null) {
           resources.boardRow.before?.destroy();
           resources.boardRow.now?.destroy();
@@ -2834,7 +2867,9 @@
           case "PENDING_CONFIRM": {
             resources.boardRow.now = createBoard("now-board", {
               position: String(workflow.pending.targetFen),
-              draggable: false,
+              draggable: isEditing,
+              dropOffBoard: isEditing ? "trash" : "snapback",
+              sparePieces: isEditing,
               showNotation: false,
               pieceTheme: pieceTheme2
             });
@@ -3235,7 +3270,10 @@
           }
           return;
         case "CHESSBOARD_READ_PREVIEW":
-          if (resources.previewBoard) {
+          if (resources.boardRow.now) {
+            const placement = getBoardFen(resources.boardRow.now);
+            dispatch({ tag: "PiecesConfirmed", placement });
+          } else if (resources.previewBoard) {
             const placement = getBoardFen(resources.previewBoard);
             dispatch({ tag: "PiecesConfirmed", placement });
           }

@@ -99,6 +99,7 @@ const initEls = () => ({
     boardRowReachIndicator: byId<HTMLSpanElement>("board-row-reach-indicator"),
     // Board row action groups
     boardRowConfirm: byId<HTMLDivElement>("board-row-confirm"),
+    boardRowEdit: byId<HTMLDivElement>("board-row-edit"),
     boardRowMatch: byId<HTMLDivElement>("board-row-match"),
     boardRowReach: byId<HTMLDivElement>("board-row-reach"),
     boardRowAnalysis: byId<HTMLDivElement>("board-row-analysis"),
@@ -106,6 +107,9 @@ const initEls = () => ({
     // Board row buttons - confirm
     btnRowConfirm: byId<HTMLButtonElement>("btn-row-confirm"),
     btnRowEdit: byId<HTMLButtonElement>("btn-row-edit"),
+    // Board row buttons - edit
+    btnRowSave: byId<HTMLButtonElement>("btn-row-save"),
+    btnRowCancelEdit: byId<HTMLButtonElement>("btn-row-cancel-edit"),
     // Board row buttons - match
     matchGameSelect: byId<HTMLSelectElement>("match-game-select"),
     btnRowContinue: byId<HTMLButtonElement>("btn-row-continue"),

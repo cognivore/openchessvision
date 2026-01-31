@@ -117,6 +117,7 @@ export type UiState = Readonly<{
   openingInputVisible: boolean;
   openingMovesInput: string;
   selectedPiece: string | null;
+  editingPosition: boolean;
 }>;
 
 export type Model = Readonly<{
@@ -179,6 +180,7 @@ export const initialModel: Model = {
     openingInputVisible: false,
     openingMovesInput: "",
     selectedPiece: null,
+    editingPosition: false,
   },
   placementKeyIndex: {},
 };
