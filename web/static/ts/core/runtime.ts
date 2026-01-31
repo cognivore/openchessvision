@@ -166,8 +166,9 @@ export const createRuntime = (initial: Model) => {
   const syncBoardRow = (): void => {
     const workflow = model.workflow;
     const isEditing = model.ui.editingPosition;
-    // Include editing state in mode key so board is recreated when editing changes
-    const modeKey = workflow.tag + (isEditing ? "-edit" : "");
+    const isSettingUpFen = model.ui.settingUpFen;
+    // Include editing/fenSetup state in mode key so board is recreated when these change
+    const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "");
 
     // Destroy boards if mode changes or workflow closes
     if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {

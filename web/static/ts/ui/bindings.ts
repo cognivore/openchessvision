@@ -113,7 +113,21 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
 
     // Board row bindings - Confirm mode
     els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowSetupFen.addEventListener("click", () => dispatch({ tag: "SetupFenMode" }));
     els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
+
+    // Board row bindings - FEN setup mode
+    els.btnRowFenDone.addEventListener("click", () => {
+        const turn = els.fenTurnSelect.value as "w" | "b";
+        let castling = "";
+        if (els.castleK.checked) castling += "K";
+        if (els.castleQ.checked) castling += "Q";
+        if (els.castlek.checked) castling += "k";
+        if (els.castleq.checked) castling += "q";
+        if (!castling) castling = "-";
+        dispatch({ tag: "FenSetupCompleted", turn, castling });
+    });
+    els.btnRowFenCancel.addEventListener("click", () => dispatch({ tag: "FenSetupCancelled" }));
 
     // Board row bindings - Edit mode
     els.btnRowSave.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));

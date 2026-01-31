@@ -106,10 +106,20 @@ const initEls = () => ({
     boardRowHowReach: byId<HTMLDivElement>("board-row-how-reach"),
     // Board row buttons - confirm
     btnRowConfirm: byId<HTMLButtonElement>("btn-row-confirm"),
+    btnRowSetupFen: byId<HTMLButtonElement>("btn-row-setup-fen"),
     btnRowEdit: byId<HTMLButtonElement>("btn-row-edit"),
     // Board row buttons - edit
     btnRowSave: byId<HTMLButtonElement>("btn-row-save"),
     btnRowCancelEdit: byId<HTMLButtonElement>("btn-row-cancel-edit"),
+    // Board row - FEN setup
+    boardRowFenSetup: byId<HTMLDivElement>("board-row-fen-setup"),
+    fenTurnSelect: byId<HTMLSelectElement>("fen-turn-select"),
+    castleK: byId<HTMLInputElement>("castle-K"),
+    castleQ: byId<HTMLInputElement>("castle-Q"),
+    castlek: byId<HTMLInputElement>("castle-k"),
+    castleq: byId<HTMLInputElement>("castle-q"),
+    btnRowFenDone: byId<HTMLButtonElement>("btn-row-fen-done"),
+    btnRowFenCancel: byId<HTMLButtonElement>("btn-row-fen-cancel"),
     // Board row buttons - match
     matchGameSelect: byId<HTMLSelectElement>("match-game-select"),
     btnRowContinue: byId<HTMLButtonElement>("btn-row-continue"),

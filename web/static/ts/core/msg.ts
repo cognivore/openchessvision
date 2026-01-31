@@ -31,6 +31,9 @@ export type Msg =
   | { tag: "PiecesConfirmed"; placement: FenPlacement }
   | { tag: "EditPieces" }
   | { tag: "CancelEdit" }
+  | { tag: "SetupFenMode" }
+  | { tag: "FenSetupCompleted"; turn: "w" | "b"; castling: string }
+  | { tag: "FenSetupCancelled" }
   | { tag: "SelectCandidate"; gameId: GameId }
   | { tag: "MatchGameSelected"; gameId: GameId }
   | { tag: "ContinueSelectedGame" }

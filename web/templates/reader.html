@@ -86,16 +86,33 @@
                     <div class="board-row-actions" id="board-row-actions">
                         <!-- Confirm mode actions -->
                         <div id="board-row-confirm" class="board-row-action-group hidden">
-                            <span class="action-label">Does this position look correct?</span>
-                            <button id="btn-row-confirm" class="btn-primary btn-small">Looks Correct</button>
+                            <span class="action-label">Position correct?</span>
+                            <button id="btn-row-confirm" class="btn-primary btn-small">✓ Yes, find moves</button>
+                            <button id="btn-row-setup-fen" class="btn-secondary btn-small">Just use FEN</button>
                             <button id="btn-row-edit" class="btn-secondary btn-small">Edit Pieces</button>
                         </div>
 
                         <!-- Edit mode actions -->
                         <div id="board-row-edit" class="board-row-action-group hidden">
-                            <span class="action-label">Drag pieces to correct, then save</span>
-                            <button id="btn-row-save" class="btn-primary btn-small">💾 Save Changes</button>
+                            <span class="action-label">Drag pieces to correct</span>
+                            <button id="btn-row-save" class="btn-primary btn-small">💾 Save</button>
                             <button id="btn-row-cancel-edit" class="btn-secondary btn-small">Cancel</button>
+                        </div>
+
+                        <!-- FEN setup mode - turn and castling -->
+                        <div id="board-row-fen-setup" class="board-row-action-group hidden">
+                            <span class="action-label">Turn:</span>
+                            <select id="fen-turn-select" class="fen-select">
+                                <option value="w">White</option>
+                                <option value="b">Black</option>
+                            </select>
+                            <span class="action-label">Castling:</span>
+                            <label class="castle-label"><input type="checkbox" id="castle-K" checked> K</label>
+                            <label class="castle-label"><input type="checkbox" id="castle-Q" checked> Q</label>
+                            <label class="castle-label"><input type="checkbox" id="castle-k" checked> k</label>
+                            <label class="castle-label"><input type="checkbox" id="castle-q" checked> q</label>
+                            <button id="btn-row-fen-done" class="btn-primary btn-small">✓ Done</button>
+                            <button id="btn-row-fen-cancel" class="btn-secondary btn-small">Back</button>
                         </div>
 
                         <!-- Match existing mode actions -->
@@ -153,11 +170,17 @@
                 </div>
             </div>
 
-            <!-- Right sidebar: White pieces + analysis -->
+            <!-- Right sidebar: White pieces + detected games -->
             <aside class="sidebar right-sidebar">
                 <section class="piece-palette-section">
                     <h3>White Pieces</h3>
                     <div class="piece-palette" id="piece-palette-white"></div>
+                </section>
+                <section class="games-section">
+                    <h3>Detected Games</h3>
+                    <div id="position-list" class="position-list">
+                        <p class="no-games">Click on a diagram to detect</p>
+                    </div>
                 </section>
                 <section class="analysis-section">
                     <h3>Analysis</h3>
@@ -165,49 +188,19 @@
                         <div class="no-analysis">
                             <p>Select a game to analyze</p>
                         </div>
-                        <div id="workflow-panel" class="workflow-panel">
-                            <div id="confirm-panel" class="workflow-card hidden">
-                                <div class="workflow-title">1) Confirm Pieces</div>
-                                <div class="workflow-text">Does this position look correct?</div>
-                                <div class="workflow-actions">
-                                    <button id="btn-confirm-pieces" class="btn-primary btn-small">Looks Correct</button>
-                                    <button id="btn-edit-pieces" class="btn-secondary btn-small">Edit Pieces</button>
-                                </div>
+                        <!-- Hidden workflow panels - kept for backwards compat with DOM refs -->
+                        <div id="workflow-panel" class="workflow-panel hidden">
+                            <div id="confirm-panel" class="hidden"></div>
+                            <div id="game-match-panel" class="hidden">
+                                <div id="game-match-list"></div>
                             </div>
-                            <div id="game-match-panel" class="workflow-card hidden">
-                                <div class="workflow-title">Existing Games Found</div>
-                                <div class="workflow-text">Continue from the main line of an existing game?</div>
-                                <div id="game-match-list" class="game-match-list"></div>
-                                <div class="workflow-actions">
-                                    <button id="btn-continue-game" class="btn-primary btn-small">Continue Main Line</button>
-                                    <button id="btn-new-game" class="btn-secondary btn-small">Start New Game</button>
-                                </div>
-                            </div>
-                            <div id="reach-panel" class="workflow-card hidden">
-                                <div class="workflow-title">2) Reach This Position</div>
-                                <div class="workflow-text">How do you want to reach this position?</div>
-                                <div class="workflow-actions">
-                                    <button id="btn-reach-otb" class="btn-primary btn-small">Play OTB</button>
-                                    <button id="btn-reach-ocr" class="btn-secondary btn-small">Extract from Text</button>
-                                </div>
-                            </div>
-                            <div id="otb-panel" class="workflow-card hidden">
-                                <div class="workflow-title">OTB Monitoring</div>
-                                <div class="workflow-text" id="otb-status">Waiting for board...</div>
-                                <button id="btn-stop-otb" class="btn-secondary btn-small">Stop</button>
-                            </div>
-                            <div id="ocr-panel" class="workflow-card hidden">
-                                <div class="workflow-title">OCR / Text Extraction</div>
-                                <div class="workflow-text">Draw a box around the move text on the PDF.</div>
-                                <button id="btn-start-text-select" class="btn-primary btn-small">Select Text Region</button>
-                                <div id="ocr-status" class="workflow-text small"></div>
-                            </div>
+                            <div id="reach-panel" class="hidden"></div>
+                            <div id="otb-panel" class="hidden"><div id="otb-status"></div></div>
+                            <div id="ocr-panel" class="hidden"><div id="ocr-status"></div></div>
                         </div>
                         <div id="continuation-prompt" class="continuation-prompt hidden">
                             <div class="continuation-header">Continue from previous?</div>
-                            <div class="continuation-info" id="continuation-info">
-                                <!-- Filled by JS: "Page X → 3 moves" -->
-                            </div>
+                            <div class="continuation-info" id="continuation-info"></div>
                             <div class="continuation-actions">
                                 <button id="btn-accept-continuation" class="btn-primary btn-small">Continue</button>
                                 <button id="btn-dismiss-continuation" class="btn-secondary btn-small">New Analysis</button>
@@ -223,23 +216,6 @@
                             <div class="engine-line" id="engine-line">-</div>
                         </div>
                     </div>
-                    <div class="analysis-actions">
-                        <button id="btn-analyse-white" class="btn-primary btn-analyse" disabled>🧠♔ Play as White</button>
-                        <button id="btn-analyse-black" class="btn-primary btn-analyse" disabled>🧠♚ Play as Black</button>
-                        <button id="btn-copy-fen" class="btn-secondary" disabled>📋 FEN</button>
-                        <button id="btn-copy-pgn" class="btn-secondary" disabled>📋 PGN</button>
-                    </div>
-                    <button id="btn-select-text" class="btn-secondary btn-small btn-set-opening" disabled>📰 Select Text</button>
-                    <!-- Opening moves input -->
-                    <div id="opening-input-panel" class="opening-input-panel hidden">
-                        <label for="opening-moves-input">Set opening moves (e.g. "1. d4 Nf6 2. c4 c5"):</label>
-                        <textarea id="opening-moves-input" class="opening-moves-input" placeholder="1. d4 Nf6 2. c4 c5 3. d5 e6" rows="2"></textarea>
-                        <div class="opening-input-actions">
-                            <button id="btn-apply-opening" class="btn-primary btn-small">Apply Moves</button>
-                            <button id="btn-cancel-opening" class="btn-secondary btn-small">Cancel</button>
-                        </div>
-                    </div>
-                    <button id="btn-set-opening" class="btn-secondary btn-small btn-set-opening" disabled>📝 Set Opening Moves</button>
                 </section>
             </aside>
         </main>
@@ -256,55 +232,41 @@
             </span>
         </footer>
 
-        <!-- Reach Position Modal (page-switch resilient) -->
-        <div id="reach-modal" class="reach-modal hidden">
-            <div class="reach-modal-backdrop"></div>
-            <div class="reach-modal-content">
-                <div class="reach-modal-header">
-                    <h2>Reach Position</h2>
-                    <button class="reach-modal-close" id="reach-modal-close">×</button>
-                </div>
-
-                <div class="reach-modal-body">
-                    <!-- Three-column layout: Start → Entry → Target -->
-                    <div class="reach-columns">
-                        <!-- Starting position -->
-                        <div class="reach-column reach-start">
-                            <h3>From</h3>
-                            <div id="reach-start-board" class="reach-board"></div>
-                            <div class="reach-label" id="reach-start-label">Starting position</div>
-                        </div>
-
-                        <!-- Move entry area -->
-                        <div class="reach-column reach-entry">
-                            <h3>Enter Moves</h3>
-                            <div id="reach-entry-board" class="reach-board reach-board-main"></div>
-                            <div class="reach-move-list" id="reach-move-list">
-                                <em>Make moves on the board above</em>
-                            </div>
-                            <div class="reach-status" id="reach-status"></div>
-                        </div>
-
-                        <!-- Target position -->
-                        <div class="reach-column reach-target">
-                            <h3>Target</h3>
-                            <div id="reach-target-board" class="reach-board"></div>
-                            <div class="reach-indicator" id="reach-indicator">
-                                <span class="reach-not-reached">Not yet reached</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="reach-modal-footer">
-                    <div class="reach-action-buttons">
-                        <button id="reach-btn-undo" class="btn-secondary" disabled>↩ Undo</button>
-                        <button id="reach-btn-reset" class="btn-secondary">↺ Reset</button>
-                        <button id="reach-btn-done" class="btn-primary" disabled>✓ Done</button>
-                        <button id="reach-btn-cancel" class="btn-secondary">Cancel</button>
-                    </div>
-                </div>
-            </div>
+        <!-- Hidden elements for backwards compatibility with DOM refs -->
+        <div class="hidden" style="display:none;">
+            <!-- Old reach modal refs -->
+            <div id="reach-modal"></div>
+            <div id="reach-modal-close"></div>
+            <div id="reach-start-board"></div>
+            <div id="reach-entry-board"></div>
+            <div id="reach-target-board"></div>
+            <div id="reach-start-label"></div>
+            <div id="reach-move-list"></div>
+            <div id="reach-status"></div>
+            <div id="reach-indicator"></div>
+            <button id="reach-btn-undo"></button>
+            <button id="reach-btn-reset"></button>
+            <button id="reach-btn-done"></button>
+            <button id="reach-btn-cancel"></button>
+            <!-- Old sidebar button refs -->
+            <button id="btn-confirm-pieces"></button>
+            <button id="btn-edit-pieces"></button>
+            <button id="btn-continue-game"></button>
+            <button id="btn-new-game"></button>
+            <button id="btn-reach-otb"></button>
+            <button id="btn-reach-ocr"></button>
+            <button id="btn-stop-otb"></button>
+            <button id="btn-start-text-select"></button>
+            <button id="btn-analyse-white"></button>
+            <button id="btn-analyse-black"></button>
+            <button id="btn-copy-fen"></button>
+            <button id="btn-copy-pgn"></button>
+            <button id="btn-select-text"></button>
+            <button id="btn-set-opening"></button>
+            <button id="btn-apply-opening"></button>
+            <button id="btn-cancel-opening"></button>
+            <textarea id="opening-moves-input"></textarea>
+            <div id="opening-input-panel"></div>
         </div>
     </div>
 

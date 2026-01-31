@@ -44,7 +44,8 @@
       openingInputVisible: false,
       openingMovesInput: "",
       selectedPiece: null,
-      editingPosition: false
+      editingPosition: false,
+      settingUpFen: false
     },
     placementKeyIndex: {}
   };
@@ -507,14 +508,34 @@
         };
         return [withStatus(nextModel, `Found ${msg.diagrams.length} potential diagrams`), noCmd];
       }
-      case "DiagramActivated":
+      case "DiagramActivated": {
+        if (msg.gameId === null) {
+          return [
+            { ...model, workflow: { tag: "VIEWING", activeGameId: null } },
+            noCmd
+          ];
+        }
+        const game = model.games.find((g) => g.id === msg.gameId);
+        if (game && !game.pending) {
+          const tree = model.analyses[msg.gameId] ?? {
+            rootFen: toFullFen(game.fen, "w"),
+            // Default to white's turn
+            nodes: []
+          };
+          return [
+            {
+              ...model,
+              workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] },
+              analyses: { ...model.analyses, [msg.gameId]: tree }
+            },
+            noCmd
+          ];
+        }
         return [
-          {
-            ...model,
-            workflow: msg.gameId === null ? { tag: "VIEWING", activeGameId: null } : { tag: "VIEWING", activeGameId: msg.gameId }
-          },
+          { ...model, workflow: { tag: "VIEWING", activeGameId: msg.gameId } },
           noCmd
         ];
+      }
       case "DeleteGame": {
         const filtered2 = model.games.filter((game) => game.id !== msg.gameId);
         const continuations = Object.fromEntries(
@@ -658,6 +679,57 @@
           },
           noCmd
         ];
+      case "SetupFenMode":
+        return [
+          {
+            ...model,
+            ui: { ...model.ui, settingUpFen: true, statusMessage: "Set turn and castling rights" }
+          },
+          noCmd
+        ];
+      case "FenSetupCancelled":
+        return [
+          {
+            ...model,
+            ui: { ...model.ui, settingUpFen: false, statusMessage: "FEN setup cancelled" }
+          },
+          noCmd
+        ];
+      case "FenSetupCompleted": {
+        if (model.workflow.tag !== "PENDING_CONFIRM") {
+          return [model, noCmd];
+        }
+        const pending = model.workflow.pending;
+        const placement = String(pending.targetFen);
+        const fullFen = `${placement} ${msg.turn} ${msg.castling} - 0 1`;
+        const newGame = {
+          id: pending.gameId,
+          page: pending.page,
+          bbox: pending.bbox,
+          fen: pending.targetFen,
+          confidence: pending.confidence,
+          pending: false
+        };
+        return [
+          {
+            ...model,
+            games: [...model.games, newGame],
+            workflow: { tag: "ANALYSIS", activeGameId: pending.gameId, cursor: [] },
+            analyses: {
+              ...model.analyses,
+              [pending.gameId]: {
+                rootFen: fullFen,
+                // FenFull
+                nodes: []
+              }
+            },
+            ui: { ...model.ui, settingUpFen: false, statusMessage: "Position set - analyze away!" },
+            isDirty: true,
+            placementKeyIndex: { ...model.placementKeyIndex, [placement]: pending.gameId }
+          },
+          [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]
+        ];
+      }
       case "SelectCandidate":
       case "MatchGameSelected": {
         if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -1320,10 +1392,20 @@
     boardRowHowReach: byId("board-row-how-reach"),
     // Board row buttons - confirm
     btnRowConfirm: byId("btn-row-confirm"),
+    btnRowSetupFen: byId("btn-row-setup-fen"),
     btnRowEdit: byId("btn-row-edit"),
     // Board row buttons - edit
     btnRowSave: byId("btn-row-save"),
     btnRowCancelEdit: byId("btn-row-cancel-edit"),
+    // Board row - FEN setup
+    boardRowFenSetup: byId("board-row-fen-setup"),
+    fenTurnSelect: byId("fen-turn-select"),
+    castleK: byId("castle-K"),
+    castleQ: byId("castle-Q"),
+    castlek: byId("castle-k"),
+    castleq: byId("castle-q"),
+    btnRowFenDone: byId("btn-row-fen-done"),
+    btnRowFenCancel: byId("btn-row-fen-cancel"),
     // Board row buttons - match
     matchGameSelect: byId("match-game-select"),
     btnRowContinue: byId("btn-row-continue"),
@@ -1572,19 +1654,7 @@
     toggleHidden(els.ocrPanel, false);
   };
   var renderOverlayBoards = (model) => {
-    const activeGame = getActiveGame(model);
-    if (!activeGame || model.workflow.tag !== "VIEWING") {
-      toggleHidden(els.boardOverlay, false);
-      return;
-    }
-    const displayBbox = pdfToCssBBox(activeGame.bbox, model.pdf.scale);
-    els.boardOverlay.style.left = `${displayBbox.x}px`;
-    els.boardOverlay.style.top = `${displayBbox.y}px`;
-    els.boardOverlay.style.width = `${displayBbox.width}px`;
-    els.boardOverlay.style.height = `${displayBbox.height}px`;
-    els.boardOverlay.classList.add("transparent");
-    els.boardOverlay.classList.remove("solid");
-    toggleHidden(els.boardOverlay, true);
+    toggleHidden(els.boardOverlay, false);
   };
   var renderDiagramOverlay = (model, dispatch) => {
     if (!model.diagrams || model.diagrams.page !== model.pdf.currentPage) {
@@ -1689,8 +1759,17 @@
       case "NO_PDF":
         return { tag: "hidden" };
       case "VIEWING":
+        if (model.workflow.activeGameId) {
+          const game = model.games.find((g) => g.id === model.workflow.activeGameId);
+          if (game) {
+            return { tag: "analysis", fen: String(game.fen) };
+          }
+        }
         return { tag: "hidden" };
       case "PENDING_CONFIRM":
+        if (model.ui.settingUpFen) {
+          return { tag: "fenSetup", fen: String(model.workflow.pending.targetFen) };
+        }
         if (model.ui.editingPosition) {
           return { tag: "edit", fen: String(model.workflow.pending.targetFen) };
         }
@@ -1741,6 +1820,7 @@
     const mode = getBoardRowMode(model);
     toggleHidden(els.boardRowConfirm, false);
     toggleHidden(els.boardRowEdit, false);
+    toggleHidden(els.boardRowFenSetup, false);
     toggleHidden(els.boardRowMatch, false);
     toggleHidden(els.boardRowReach, false);
     toggleHidden(els.boardRowAnalysis, false);
@@ -1762,6 +1842,12 @@
         toggleHidden(els.boardSlotAfter, false);
         toggleHidden(els.boardRowEdit, true);
         setText(els.nowBoardInfo, "Editing - drag pieces");
+        break;
+      case "fenSetup":
+        toggleHidden(els.boardSlotBefore, false);
+        toggleHidden(els.boardSlotAfter, false);
+        toggleHidden(els.boardRowFenSetup, true);
+        setText(els.nowBoardInfo, "Set turn & castling rights");
         break;
       case "match":
         toggleHidden(els.boardSlotBefore, mode.beforeFen !== null);
@@ -1955,7 +2041,19 @@
       backdrop.addEventListener("click", () => dispatch({ tag: "ReachCancel" }));
     }
     els.btnRowConfirm.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
+    els.btnRowSetupFen.addEventListener("click", () => dispatch({ tag: "SetupFenMode" }));
     els.btnRowEdit.addEventListener("click", () => dispatch({ tag: "EditPieces" }));
+    els.btnRowFenDone.addEventListener("click", () => {
+      const turn = els.fenTurnSelect.value;
+      let castling = "";
+      if (els.castleK.checked) castling += "K";
+      if (els.castleQ.checked) castling += "Q";
+      if (els.castlek.checked) castling += "k";
+      if (els.castleq.checked) castling += "q";
+      if (!castling) castling = "-";
+      dispatch({ tag: "FenSetupCompleted", turn, castling });
+    });
+    els.btnRowFenCancel.addEventListener("click", () => dispatch({ tag: "FenSetupCancelled" }));
     els.btnRowSave.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
     els.btnRowCancelEdit.addEventListener("click", () => dispatch({ tag: "CancelEdit" }));
     els.btnRowContinue.addEventListener("click", () => dispatch({ tag: "ContinueSelectedGame" }));
@@ -2847,7 +2945,8 @@
     const syncBoardRow = () => {
       const workflow = model.workflow;
       const isEditing = model.ui.editingPosition;
-      const modeKey = workflow.tag + (isEditing ? "-edit" : "");
+      const isSettingUpFen = model.ui.settingUpFen;
+      const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "");
       if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {
         if (resources.boardRow.currentMode !== null) {
           resources.boardRow.before?.destroy();

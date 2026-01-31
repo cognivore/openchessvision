@@ -236,17 +236,35 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       };
       return [withStatus(nextModel, `Found ${msg.diagrams.length} potential diagrams`), noCmd];
     }
-    case "DiagramActivated":
+    case "DiagramActivated": {
+      if (msg.gameId === null) {
+        return [
+          { ...model, workflow: { tag: "VIEWING", activeGameId: null } },
+          noCmd,
+        ];
+      }
+      const game = model.games.find((g) => g.id === msg.gameId);
+      // If game is confirmed (not pending), go directly to analysis mode
+      if (game && !game.pending) {
+        // Check if analysis tree exists, create if not
+        const tree = model.analyses[msg.gameId] ?? {
+          rootFen: toFullFen(game.fen, "w"), // Default to white's turn
+          nodes: [],
+        };
+        return [
+          {
+            ...model,
+            workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] },
+            analyses: { ...model.analyses, [msg.gameId]: tree },
+          },
+          noCmd,
+        ];
+      }
       return [
-        {
-          ...model,
-          workflow:
-            msg.gameId === null
-              ? { tag: "VIEWING", activeGameId: null }
-              : { tag: "VIEWING", activeGameId: msg.gameId },
-        },
+        { ...model, workflow: { tag: "VIEWING", activeGameId: msg.gameId } },
         noCmd,
       ];
+    }
     case "DeleteGame": {
       const filtered = model.games.filter((game) => game.id !== msg.gameId);
       const continuations = Object.fromEntries(
@@ -391,6 +409,58 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         },
         noCmd,
       ];
+    case "SetupFenMode":
+      return [
+        {
+          ...model,
+          ui: { ...model.ui, settingUpFen: true, statusMessage: "Set turn and castling rights" },
+        },
+        noCmd,
+      ];
+    case "FenSetupCancelled":
+      return [
+        {
+          ...model,
+          ui: { ...model.ui, settingUpFen: false, statusMessage: "FEN setup cancelled" },
+        },
+        noCmd,
+      ];
+    case "FenSetupCompleted": {
+      if (model.workflow.tag !== "PENDING_CONFIRM") {
+        return [model, noCmd];
+      }
+      const pending = model.workflow.pending;
+      const placement = String(pending.targetFen);
+      // Construct full FEN: placement turn castling en_passant halfmove fullmove
+      const fullFen = `${placement} ${msg.turn} ${msg.castling} - 0 1`;
+      const newGame: Game = {
+        id: pending.gameId,
+        page: pending.page,
+        bbox: pending.bbox,
+        fen: pending.targetFen,
+        confidence: pending.confidence,
+        pending: false,
+      };
+      // Start analysis immediately with the constructed FEN
+      return [
+        {
+          ...model,
+          games: [...model.games, newGame],
+          workflow: { tag: "ANALYSIS", activeGameId: pending.gameId, cursor: [] },
+          analyses: {
+            ...model.analyses,
+            [pending.gameId]: {
+              rootFen: fullFen as any, // FenFull
+              nodes: [],
+            },
+          },
+          ui: { ...model.ui, settingUpFen: false, statusMessage: "Position set - analyze away!" },
+          isDirty: true,
+          placementKeyIndex: { ...model.placementKeyIndex, [placement as any]: pending.gameId },
+        },
+        [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }],
+      ];
+    }
     case "SelectCandidate":
     case "MatchGameSelected": {
       if (model.workflow.tag !== "MATCH_EXISTING") {

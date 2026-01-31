@@ -11,6 +11,7 @@ type BoardRowMode =
   | { tag: "hidden" }
   | { tag: "confirm"; fen: string }
   | { tag: "edit"; fen: string }
+  | { tag: "fenSetup"; fen: string }
   | { tag: "match"; beforeFen: string | null; nowFen: string; candidates: ReadonlyArray<GameId> }
   | { tag: "reach"; beforeFen: string; nowFen: string; afterFen: string; moves: number; reached: boolean }
   | { tag: "analysis"; fen: string }
@@ -101,21 +102,8 @@ const renderWorkflowPanels = (_model: Model): void => {
 };
 
 const renderOverlayBoards = (model: Model): void => {
-  const activeGame = getActiveGame(model);
-  // Only show transparent overlay in VIEWING mode (for alignment verification)
-  // In ANALYSIS, PENDING_CONFIRM, MATCH_EXISTING, and REACHING modes, use the board row instead
-  if (!activeGame || model.workflow.tag !== "VIEWING") {
-    toggleHidden(els.boardOverlay, false);
-    return;
-  }
-  const displayBbox = pdfToCssBBox(activeGame.bbox, model.pdf.scale);
-  els.boardOverlay.style.left = `${displayBbox.x}px`;
-  els.boardOverlay.style.top = `${displayBbox.y}px`;
-  els.boardOverlay.style.width = `${displayBbox.width}px`;
-  els.boardOverlay.style.height = `${displayBbox.height}px`;
-  els.boardOverlay.classList.add("transparent");
-  els.boardOverlay.classList.remove("solid");
-  toggleHidden(els.boardOverlay, true);
+  // The board row now handles all board display - hide the old overlay
+  toggleHidden(els.boardOverlay, false);
 };
 
 const renderDiagramOverlay = (model: Model, dispatch: Dispatch): void => {
@@ -235,10 +223,19 @@ const getBoardRowMode = (model: Model): BoardRowMode => {
     case "NO_PDF":
       return { tag: "hidden" };
     case "VIEWING":
-      // In viewing mode, we don't show the board row (transparent overlay on PDF instead)
+      // Show analysis board when a game is selected
+      if (model.workflow.activeGameId) {
+        const game = model.games.find(g => g.id === model.workflow.activeGameId);
+        if (game) {
+          return { tag: "analysis", fen: String(game.fen) };
+        }
+      }
       return { tag: "hidden" };
     case "PENDING_CONFIRM":
-      // Show edit mode if editing, otherwise confirm mode
+      // Show FEN setup mode, edit mode, or confirm mode
+      if (model.ui.settingUpFen) {
+        return { tag: "fenSetup", fen: String(model.workflow.pending.targetFen) };
+      }
       if (model.ui.editingPosition) {
         return { tag: "edit", fen: String(model.workflow.pending.targetFen) };
       }
@@ -294,6 +291,7 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
   // Hide all action groups first
   toggleHidden(els.boardRowConfirm, false);
   toggleHidden(els.boardRowEdit, false);
+  toggleHidden(els.boardRowFenSetup, false);
   toggleHidden(els.boardRowMatch, false);
   toggleHidden(els.boardRowReach, false);
   toggleHidden(els.boardRowAnalysis, false);
@@ -324,6 +322,14 @@ const renderBoardRow = (model: Model, dispatch: Dispatch): void => {
       toggleHidden(els.boardSlotAfter, false);
       toggleHidden(els.boardRowEdit, true);
       setText(els.nowBoardInfo, "Editing - drag pieces");
+      break;
+
+    case "fenSetup":
+      // Only "Now" board, FEN setup actions (turn/castling)
+      toggleHidden(els.boardSlotBefore, false);
+      toggleHidden(els.boardSlotAfter, false);
+      toggleHidden(els.boardRowFenSetup, true);
+      setText(els.nowBoardInfo, "Set turn & castling rights");
       break;
 
     case "match":
