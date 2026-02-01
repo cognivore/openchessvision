@@ -1380,3 +1380,104 @@ button:disabled {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
 }
+
+/* Help Overlay */
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.help-overlay.hidden {
+    display: none;
+}
+
+.help-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-gold);
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.help-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.help-header h2 {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.help-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.help-close:hover {
+    color: var(--accent-gold);
+}
+
+.help-content {
+    padding: 1rem 1.5rem;
+}
+
+.help-section {
+    margin-bottom: 1.5rem;
+}
+
+.help-section:last-child {
+    margin-bottom: 0;
+}
+
+.help-section h3 {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent-copper);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.help-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.help-row kbd {
+    display: inline-block;
+    min-width: 24px;
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--accent-green);
+}

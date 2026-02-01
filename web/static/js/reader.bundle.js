@@ -2394,10 +2394,29 @@
         case "p":
           dispatch({ tag: "AnalysisPromoteVariation" });
           break;
+        case "?":
+          toggleHelpOverlay();
+          break;
         default:
           break;
       }
     });
+    const helpOverlay = document.getElementById("help-overlay");
+    const helpClose = document.getElementById("help-close");
+    if (helpOverlay && helpClose) {
+      helpClose.addEventListener("click", () => toggleHelpOverlay());
+      helpOverlay.addEventListener("click", (e) => {
+        if (e.target === helpOverlay) {
+          toggleHelpOverlay();
+        }
+      });
+    }
+  };
+  var toggleHelpOverlay = () => {
+    const helpOverlay = document.getElementById("help-overlay");
+    if (helpOverlay) {
+      helpOverlay.classList.toggle("hidden");
+    }
   };
 
   // static/ts/ui/palette.ts

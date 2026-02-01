@@ -208,8 +208,30 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
             case "p":
                 dispatch({ tag: "AnalysisPromoteVariation" });
                 break;
+            case "?":
+                toggleHelpOverlay();
+                break;
             default:
                 break;
         }
     });
+
+    // Help overlay bindings
+    const helpOverlay = document.getElementById("help-overlay");
+    const helpClose = document.getElementById("help-close");
+    if (helpOverlay && helpClose) {
+        helpClose.addEventListener("click", () => toggleHelpOverlay());
+        helpOverlay.addEventListener("click", (e) => {
+            if (e.target === helpOverlay) {
+                toggleHelpOverlay();
+            }
+        });
+    }
+};
+
+const toggleHelpOverlay = (): void => {
+    const helpOverlay = document.getElementById("help-overlay");
+    if (helpOverlay) {
+        helpOverlay.classList.toggle("hidden");
+    }
 };
