@@ -1035,32 +1035,40 @@ button:disabled {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* Variation styling */
+/* Variation styling - Rainbow brackets by depth */
 .move-list .variation {
     display: inline;
-    color: var(--accent-purple);
     font-size: 0.9em;
     margin-left: 4px;
 }
 
-.move-list .variation-bracket {
-    color: var(--accent-purple);
-    font-weight: 600;
-}
+/* Rainbow color palette for variation depths (cycles every 6 levels) */
+.move-list .variation.variation-depth-0 { color: #bf00ff; } /* Purple */
+.move-list .variation.variation-depth-1 { color: #00bfff; } /* Cyan */
+.move-list .variation.variation-depth-2 { color: #00ff88; } /* Green */
+.move-list .variation.variation-depth-3 { color: #ff8800; } /* Orange */
+.move-list .variation.variation-depth-4 { color: #ff0088; } /* Pink */
+.move-list .variation.variation-depth-5 { color: #ffff00; } /* Yellow */
 
+/* Move items inside variations inherit parent variation color by default */
 .move-list .variation .move-item {
-    color: #c8a8ff;
+    color: inherit;
+    opacity: 0.9;
 }
 
 .move-list .variation .move-item:hover {
     color: #ffffff;
-    background: rgba(191, 0, 255, 0.3);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
 }
 
-.move-list .variation .move-item.current {
-    background: var(--accent-purple);
-    color: #ffffff;
-}
+/* Current move in variations - use variation's color as background */
+.move-list .variation.variation-depth-0 .move-item.current { background: #bf00ff; color: #fff; }
+.move-list .variation.variation-depth-1 .move-item.current { background: #00bfff; color: #000; }
+.move-list .variation.variation-depth-2 .move-item.current { background: #00ff88; color: #000; }
+.move-list .variation.variation-depth-3 .move-item.current { background: #ff8800; color: #000; }
+.move-list .variation.variation-depth-4 .move-item.current { background: #ff0088; color: #fff; }
+.move-list .variation.variation-depth-5 .move-item.current { background: #ffff00; color: #000; }
 
 .analysis-actions {
     display: flex;

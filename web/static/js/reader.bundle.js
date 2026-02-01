@@ -1974,15 +1974,16 @@
     const currentPath = model.workflow.cursor;
     const pathEquals = (a, b) => a.length === b.length && a.every((item, idx) => item === b[idx]);
     const pathIsPrefix = (prefix, full) => prefix.every((item, idx) => item === full[idx]);
-    const renderTree = (node, moveNum, isWhite, path, depth) => {
+    const renderTree = (node, moveNum, isWhite, path, variationDepth) => {
       let html = "";
       node.children.forEach((child, index) => {
         if (!child.san)
           return;
         const childPath = [...path, child.san];
         const isVariation = index > 0;
-        if (isVariation && depth === 0) {
-          html += ' <span class="variation">(';
+        if (isVariation) {
+          const depthClass = variationDepth % 6;
+          html += ` <span class="variation variation-depth-${depthClass}">(`;
           if (!isWhite) {
             html += `<span class="move-number">${moveNum}...</span> `;
           }
@@ -1999,8 +2000,9 @@
           classes.push("on-path");
         html += `<span class="${classes.join(" ")}" data-path='${JSON.stringify(childPath)}'>${child.san}</span>`;
         const nextMoveNum = isWhite ? moveNum : moveNum + 1;
-        html += ` ${renderTree(child, nextMoveNum, !isWhite, childPath, isVariation ? depth + 1 : depth)}`;
-        if (isVariation && depth === 0) {
+        const nextDepth = isVariation ? variationDepth + 1 : variationDepth;
+        html += ` ${renderTree(child, nextMoveNum, !isWhite, childPath, nextDepth)}`;
+        if (isVariation) {
           html += ")</span>";
         }
       });

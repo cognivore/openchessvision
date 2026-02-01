@@ -191,15 +191,17 @@ const renderAnalysis = (model: Model, dispatch: Dispatch): void => {
     moveNum: number,
     isWhite: boolean,
     path: ReadonlyArray<string>,
-    depth: number,
+    variationDepth: number,
   ): string => {
     let html = "";
     node.children.forEach((child, index) => {
       if (!child.san) return;
       const childPath = [...path, child.san];
       const isVariation = index > 0;
-      if (isVariation && depth === 0) {
-        html += " <span class=\"variation\">(";
+      // Always wrap variations with depth-based coloring (rainbow brackets)
+      if (isVariation) {
+        const depthClass = variationDepth % 6; // Cycle through 6 colors
+        html += ` <span class="variation variation-depth-${depthClass}">(`;
         if (!isWhite) {
           html += `<span class="move-number">${moveNum}...</span> `;
         }
@@ -214,8 +216,10 @@ const renderAnalysis = (model: Model, dispatch: Dispatch): void => {
       if (isOnPath) classes.push("on-path");
       html += `<span class="${classes.join(" ")}" data-path='${JSON.stringify(childPath)}'>${child.san}</span>`;
       const nextMoveNum = isWhite ? moveNum : moveNum + 1;
-      html += ` ${renderTree(child, nextMoveNum, !isWhite, childPath, isVariation ? depth + 1 : depth)}`;
-      if (isVariation && depth === 0) {
+      // Increment variation depth when entering a variation, keep same otherwise
+      const nextDepth = isVariation ? variationDepth + 1 : variationDepth;
+      html += ` ${renderTree(child, nextMoveNum, !isWhite, childPath, nextDepth)}`;
+      if (isVariation) {
         html += ")</span>";
       }
     });
