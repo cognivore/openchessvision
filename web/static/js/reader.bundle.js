@@ -1335,13 +1335,17 @@
         const node = getNode(ctx.tree.root, nextCursor);
         if (!node)
           return [model, noCmd];
+        const cmds = [
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+          ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : []
+        ];
         return [
           {
             ...model,
             currentNode: nextCursor,
             workflow: { ...model.workflow, cursor: nextCursor }
           },
-          model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd
+          cmds
         ];
       }
       case "AnalysisPrevVariation": {
@@ -1356,13 +1360,17 @@
         const node = getNode(ctx.tree.root, nextCursor);
         if (!node)
           return [model, noCmd];
+        const cmds = [
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+          ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : []
+        ];
         return [
           {
             ...model,
             currentNode: nextCursor,
             workflow: { ...model.workflow, cursor: nextCursor }
           },
-          model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd
+          cmds
         ];
       }
       case "AnalysisDeleteVariation": {
@@ -1413,7 +1421,10 @@
           currentNode: msg.path,
           workflow: { ...model.workflow, cursor: msg.path }
         };
-        const cmds = model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd;
+        const cmds = [
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+          ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : []
+        ];
         return [nextModel, cmds];
       }
       case "EngineStarted":
@@ -3628,7 +3639,13 @@
           }
           return;
         case "CHESSNUT_SET_FEN": {
-          await setFen(cmd.fen, cmd.force);
+          console.log("[DEBUG] CHESSNUT_SET_FEN - sending fen:", cmd.fen, "force:", cmd.force);
+          const setResult = await setFen(cmd.fen, cmd.force);
+          if (setResult.ok) {
+            console.log("[DEBUG] CHESSNUT_SET_FEN - success:", setResult.value);
+          } else {
+            console.error("[DEBUG] CHESSNUT_SET_FEN - failed:", setResult.error);
+          }
           return;
         }
         case "CHESSNUT_POLL_START": {

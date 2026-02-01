@@ -1067,13 +1067,17 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       if (!nextCursor) return [model, noCmd];
       const node = getNode(ctx.tree.root, nextCursor);
       if (!node) return [model, noCmd];
+      const cmds: Cmd[] = [
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+        ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 } as Cmd] : []),
+      ];
       return [
         {
           ...model,
           currentNode: nextCursor,
           workflow: { ...model.workflow, cursor: nextCursor },
         },
-        model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd,
+        cmds,
       ];
     }
     case "AnalysisPrevVariation": {
@@ -1084,13 +1088,17 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       if (!nextCursor) return [model, noCmd];
       const node = getNode(ctx.tree.root, nextCursor);
       if (!node) return [model, noCmd];
+      const cmds: Cmd[] = [
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+        ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 } as Cmd] : []),
+      ];
       return [
         {
           ...model,
           currentNode: nextCursor,
           workflow: { ...model.workflow, cursor: nextCursor },
         },
-        model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd,
+        cmds,
       ];
     }
     case "AnalysisDeleteVariation": {
@@ -1132,9 +1140,10 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         currentNode: msg.path,
         workflow: { ...model.workflow, cursor: msg.path },
       };
-      const cmds = model.engine.running
-        ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }]
-        : noCmd;
+      const cmds: Cmd[] = [
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+        ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 } as Cmd] : []),
+      ];
       return [nextModel, cmds];
     }
     case "EngineStarted":

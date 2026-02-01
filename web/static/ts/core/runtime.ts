@@ -149,6 +149,8 @@ export const createRuntime = (initial: Model) => {
       // Only sync position in analysis mode - in preview mode, let user edit freely
       resources.previewBoard?.position(String(boardFen), false);
     }
+    // Always update analysisGame when in analysis mode to match current position
+    // This ensures onDrop validates against the correct position after navigation
     resources.analysisGame = mode === "analysis" && analysisFen ? new Chess(analysisFen) : null;
   };
 
@@ -572,7 +574,13 @@ export const createRuntime = (initial: Model) => {
         }
         return;
       case "CHESSNUT_SET_FEN": {
-        await setFen(cmd.fen, cmd.force);
+        console.log("[DEBUG] CHESSNUT_SET_FEN - sending fen:", cmd.fen, "force:", cmd.force);
+        const setResult = await setFen(cmd.fen, cmd.force);
+        if (setResult.ok) {
+          console.log("[DEBUG] CHESSNUT_SET_FEN - success:", setResult.value);
+        } else {
+          console.error("[DEBUG] CHESSNUT_SET_FEN - failed:", setResult.error);
+        }
         return;
       }
       case "CHESSNUT_POLL_START": {
