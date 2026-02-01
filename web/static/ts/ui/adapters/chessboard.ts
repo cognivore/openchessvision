@@ -1,10 +1,13 @@
 import type { FenPlacement, FenFull } from "../../domain/chess/fen";
 import { asFenPlacement } from "../../domain/chess/fen";
 
+export type BoardOrientation = "white" | "black";
+
 export type ChessboardInstance = {
   destroy(): void;
   position(position?: string | Record<string, string>, animate?: boolean): Record<string, string>;
   resize(): void;
+  orientation(orientation?: BoardOrientation): BoardOrientation;
 };
 
 export type ChessboardConfig = {
@@ -12,6 +15,7 @@ export type ChessboardConfig = {
   draggable: boolean;
   showNotation: boolean;
   pieceTheme: string;
+  orientation?: BoardOrientation;
   onDragStart?: (...args: unknown[]) => boolean | void;
   onDrop?: (...args: unknown[]) => string | void;
   onSnapEnd?: (...args: unknown[]) => void;

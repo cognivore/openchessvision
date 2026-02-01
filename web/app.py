@@ -162,7 +162,7 @@ def js_error():
 @app.route("/debug")
 def debug():
     """Debug endpoint that auto-loads a hardcoded PDF."""
-    return render_template("reader.html", debug_mode=True)
+    return render_template("reader.html", debug_mode=True, build_info=BUILD_INFO)
 
 
 @app.route("/api/debug-load")
@@ -1009,7 +1009,8 @@ def board_fen():
         import json as json_module
 
         config = get_config()
-        url = f"{config.base_url}/api/state/fen"
+        # Use /api/state (GET) to fetch current state, not /api/state/fen (POST-only)
+        url = f"{config.base_url}/api/state"
 
         with urllib.request.urlopen(url, timeout=config.timeout) as response:
             data = json_module.loads(response.read().decode("utf-8"))

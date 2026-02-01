@@ -153,6 +153,40 @@ export const deleteVariation = (
   return { tree: { ...tree, root: nextRoot }, cursor: nextCursor, deleted: true };
 };
 
+export const promoteVariation = (
+  tree: AnalysisTree,
+  cursor: NodePath,
+): { tree: AnalysisTree; promoted: boolean } => {
+  // Cannot promote root or if cursor is empty
+  if (cursor.length === 0) return { tree, promoted: false };
+  const parentPath = cursor.slice(0, -1);
+  const currentSan = cursor[cursor.length - 1];
+  const parent = getNode(tree.root, parentPath);
+  if (!parent) return { tree, promoted: false };
+
+  // Find the index of the current variation
+  const idx = parent.children.findIndex((child) => child.san === currentSan);
+  if (idx === -1 || idx === 0) {
+    // Already main line or not found
+    return { tree, promoted: false };
+  }
+
+  // Reorder children: move current variation to index 0
+  const currentChild = parent.children[idx];
+  const reorderedChildren = [
+    currentChild,
+    ...parent.children.slice(0, idx),
+    ...parent.children.slice(idx + 1),
+  ];
+
+  const nextRoot = updateNodeAtPath(tree.root, parentPath, (node) => ({
+    ...node,
+    children: reorderedChildren,
+  }));
+
+  return { tree: { ...tree, root: nextRoot }, promoted: true };
+};
+
 export const getMainLineLeaf = (
   tree: AnalysisTree,
 ): { node: AnalysisNode; path: NodePath } => {

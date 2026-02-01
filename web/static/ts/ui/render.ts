@@ -42,7 +42,35 @@ const updateBoardStatus = (available: boolean, connected: boolean): void => {
   }
 };
 
+// Memoization for renderPositions to prevent blinking on every render cycle
+let lastPositionsSignature = "";
+
+const computePositionsSignature = (model: Model): string => {
+  const visibleGames = model.games.filter((game) => !game.pending);
+  const activeId = getActiveGameId(model.workflow);
+  // Include game IDs, active state, and analysis/continuation state
+  const parts = visibleGames.map((game) => {
+    const hasAnalysis = Boolean(model.analyses[game.id] || model.continuations[game.id]);
+    const isActive = activeId === game.id;
+    return `${game.id}:${game.page}:${game.fen}:${isActive}:${hasAnalysis}`;
+  });
+  return `${activeId ?? "none"}|${parts.join(",")}`;
+};
+
 const renderPositions = (model: Model, dispatch: Dispatch): void => {
+  const signature = computePositionsSignature(model);
+  if (signature === lastPositionsSignature) {
+    // Only update active state on existing items without full re-render
+    const activeId = getActiveGameId(model.workflow);
+    els.positionList.querySelectorAll(".position-item").forEach((item) => {
+      const el = item as HTMLElement;
+      const id = el.dataset.id;
+      el.classList.toggle("active", id === activeId);
+    });
+    return;
+  }
+  lastPositionsSignature = signature;
+
   els.positionList.innerHTML = "";
   const visibleGames = model.games.filter((game) => !game.pending);
   const activeId = getActiveGameId(model.workflow);

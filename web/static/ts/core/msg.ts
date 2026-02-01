@@ -19,13 +19,13 @@ export type Msg =
   | { tag: "DiagramClicked"; page: PageNum; bbox: CssBBox; diagramIndex: number }
   | { tag: "DiagramResized"; page: PageNum; bbox: CssBBox }
   | {
-      tag: "Recognized";
-      page: PageNum;
-      bbox: PdfBBox;
-      placement: FenPlacement;
-      confidence: number;
-      gameId: GameId;
-    }
+    tag: "Recognized";
+    page: PageNum;
+    bbox: PdfBBox;
+    placement: FenPlacement;
+    confidence: number;
+    gameId: GameId;
+  }
   | { tag: "RecognitionFailed"; message: string }
   | { tag: "ConfirmPieces" }
   | { tag: "PiecesConfirmed"; placement: FenPlacement }
@@ -58,6 +58,7 @@ export type Msg =
   | { tag: "AnalysisNextVariation" }
   | { tag: "AnalysisPrevVariation" }
   | { tag: "AnalysisDeleteVariation" }
+  | { tag: "AnalysisPromoteVariation" }
   | { tag: "AnalysisGoTo"; path: NodePath }
   | { tag: "EngineStarted" }
   | { tag: "EngineStopped" }

@@ -29,6 +29,7 @@ import {
   goBack,
   goForward,
   makeMove,
+  promoteVariation,
   toPGN,
 } from "../domain/chess/analysisTree";
 import { asSan } from "../domain/chess/san";
@@ -135,6 +136,269 @@ const createReachSession = (
   };
 };
 
+// =============================================================================
+// Analysis Handlers
+// =============================================================================
+
+const handleAnalysisStarted = (
+  model: Model,
+  gameId: GameId,
+  turn: "w" | "b",
+): UpdateResult => {
+  const position = model.games.find((game) => game.id === gameId);
+  if (!position) {
+    return [model, noCmd];
+  }
+  const continuation = model.continuations[gameId];
+  const linkedTree = continuation ? model.analyses[continuation.analysisId] : undefined;
+  if (continuation && linkedTree) {
+    const node = getNode(linkedTree.root, continuation.nodePath);
+    const fen = node ? node.fen : linkedTree.startFen;
+    const nextModel: Model = {
+      ...model,
+      currentNode: continuation.nodePath,
+      workflow: {
+        tag: "ANALYSIS" as const,
+        activeGameId: gameId,
+        cursor: continuation.nodePath,
+      },
+    };
+    return [
+      nextModel,
+      [
+        { tag: "ENGINE_ANALYZE", fen, depth: 16 },
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+        { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+      ],
+    ];
+  }
+  const fullFen = toFullFen(position.fen, turn);
+  const existing = model.analyses[gameId];
+  const tree = existing ?? createAnalysisTree(fullFen, turn);
+  const nextModel: Model = {
+    ...model,
+    analyses: existing ? model.analyses : { ...model.analyses, [gameId]: tree },
+    currentNode: [],
+    workflow: { tag: "ANALYSIS" as const, activeGameId: gameId, cursor: [] },
+  };
+  return [
+    nextModel,
+    [
+      { tag: "ENGINE_ANALYZE", fen: fullFen, depth: 16 },
+      { tag: "CHESSNUT_SET_FEN", fen: position.fen, force: true },
+      { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+    ],
+  ];
+};
+
+const handleAnalysisMoveMade = (
+  model: Model,
+  san: ReturnType<typeof asSan>,
+  fen: ReturnType<typeof asFenFull>,
+): UpdateResult => {
+  if (model.workflow.tag !== "ANALYSIS") {
+    return [model, noCmd];
+  }
+  const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+  if (!ctx) return [model, noCmd];
+  const next = makeMove(ctx.tree, model.workflow.cursor, san, fen);
+  const nextModel: Model = {
+    ...model,
+    analyses: { ...model.analyses, [ctx.analysisId]: next.tree },
+    currentNode: next.cursor,
+    workflow: { ...model.workflow, cursor: next.cursor },
+    isDirty: true,
+  };
+  const cmds: Cmd[] = [
+    { tag: "SCHEDULE_SAVE", delayMs: 2000 },
+    { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+    ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE" as const, fen, depth: 16 }] : []),
+  ];
+  return [nextModel, cmds];
+};
+
+// =============================================================================
+// Diagram/Recognition Handlers
+// =============================================================================
+
+const handleDiagramActivated = (
+  model: Model,
+  gameId: GameId | null,
+): UpdateResult => {
+  console.log("[DEBUG] DiagramActivated:", { gameId });
+  if (gameId === null) {
+    console.log("[DEBUG] DiagramActivated: closing (gameId is null)");
+    return [
+      { ...model, workflow: { tag: "VIEWING" as const, activeGameId: null } },
+      noCmd,
+    ];
+  }
+  const game = model.games.find((g) => g.id === gameId);
+  console.log("[DEBUG] DiagramActivated: found game:", game);
+  if (!game) {
+    console.log("[DEBUG] DiagramActivated: game not found, returning");
+    return [model, noCmd];
+  }
+
+  // Check if there's a continuation (previously entered moves)
+  const continuation = model.continuations[gameId];
+  console.log("[DEBUG] DiagramActivated: continuation:", continuation);
+  const continuationTree = continuation ? model.analyses[continuation.analysisId] : undefined;
+  if (continuation && continuationTree) {
+    console.log("[DEBUG] DiagramActivated: resuming continuation");
+    const node = getNode(continuationTree.root, continuation.nodePath);
+    const fen = node ? asFenFull(node.fen) : continuationTree.startFen;
+    return [
+      {
+        ...model,
+        currentNode: continuation.nodePath,
+        workflow: {
+          tag: "ANALYSIS" as const,
+          activeGameId: gameId,
+          cursor: continuation.nodePath,
+        },
+      },
+      [
+        { tag: "ENGINE_ANALYZE", fen, depth: 16 },
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+        { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+      ],
+    ];
+  }
+
+  // If game is confirmed (not pending), go directly to analysis mode
+  console.log("[DEBUG] DiagramActivated: game.pending =", game.pending);
+  if (!game.pending) {
+    console.log("[DEBUG] DiagramActivated: going to ANALYSIS mode (not pending)");
+    const fullFen = toFullFen(game.fen, "w");
+    const tree = model.analyses[gameId] ?? createAnalysisTree(fullFen, "w");
+    return [
+      {
+        ...model,
+        workflow: { tag: "ANALYSIS" as const, activeGameId: gameId, cursor: [] },
+        analyses: { ...model.analyses, [gameId]: tree },
+      },
+      [
+        { tag: "CHESSNUT_SET_FEN", fen: game.fen, force: true },
+        { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+      ],
+    ];
+  }
+
+  // Game is pending - go to PENDING_CONFIRM to let user confirm/setup
+  console.log("[DEBUG] DiagramActivated: game is pending, going to PENDING_CONFIRM");
+  return [
+    {
+      ...model,
+      workflow: {
+        tag: "PENDING_CONFIRM" as const,
+        pending: {
+          gameId: game.id,
+          targetFen: game.fen,
+          page: game.page,
+          bbox: game.bbox,
+          confidence: game.confidence,
+        },
+      },
+    },
+    noCmd,
+  ];
+};
+
+// =============================================================================
+// Board FEN Handlers
+// =============================================================================
+
+const handleBoardFenUpdated = (
+  model: Model,
+  fen: ReturnType<typeof asFenFull>,
+): UpdateResult => {
+  console.log("[DEBUG] BoardFenUpdated:", fen);
+  console.log("[DEBUG] workflow.tag:", model.workflow.tag);
+
+  // Handle REACHING mode
+  if (model.workflow.tag === "REACHING") {
+    try {
+      const currentPlacement = extractPlacement(model.workflow.session.currentFen);
+      const nextPlacement = extractPlacement(fen);
+      console.log("[DEBUG] REACHING currentPlacement:", currentPlacement);
+      console.log("[DEBUG] REACHING nextPlacement:", nextPlacement);
+      if (currentPlacement === nextPlacement) {
+        return [model, noCmd];
+      }
+      const baseGame = new Chess(model.workflow.session.currentFen);
+      const moves = baseGame.moves({ verbose: true });
+      for (const move of moves) {
+        const testGame = new Chess(model.workflow.session.currentFen);
+        testGame.move(move);
+        const resultFen = asFenFull(testGame.fen());
+        if (extractPlacement(resultFen) === nextPlacement) {
+          console.log("[DEBUG] REACHING found move:", move.san);
+          return [
+            {
+              ...model,
+              workflow: {
+                ...model.workflow,
+                session: {
+                  ...model.workflow.session,
+                  moves: [...model.workflow.session.moves, asSan(move.san)],
+                  currentFen: resultFen,
+                },
+              },
+            },
+            noCmd,
+          ];
+        }
+      }
+      console.log("[DEBUG] REACHING no matching move found");
+    } catch (e) {
+      console.error("[DEBUG] REACHING error:", e);
+    }
+    return [model, noCmd];
+  }
+
+  // Handle ANALYSIS mode
+  if (model.workflow.tag === "ANALYSIS") {
+    const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+    if (!ctx) {
+      console.log("[DEBUG] ANALYSIS no context");
+      return [model, noCmd];
+    }
+    const currentNode = getNode(ctx.tree.root, ctx.nodePath);
+    const currentFen = currentNode ? asFenFull(currentNode.fen) : ctx.tree.startFen;
+    const currentPlacement = extractPlacement(currentFen);
+    const nextPlacement = extractPlacement(fen);
+    console.log("[DEBUG] ANALYSIS currentPlacement:", currentPlacement);
+    console.log("[DEBUG] ANALYSIS nextPlacement:", nextPlacement);
+    if (currentPlacement === nextPlacement) {
+      return [model, noCmd];
+    }
+    try {
+      const baseGame = new Chess(currentFen);
+      const moves = baseGame.moves({ verbose: true });
+      for (const move of moves) {
+        const testGame = new Chess(currentFen);
+        testGame.move(move);
+        const resultFen = asFenFull(testGame.fen());
+        if (extractPlacement(resultFen) === nextPlacement) {
+          console.log("[DEBUG] ANALYSIS found move:", move.san);
+          return handleAnalysisMoveMade(model, asSan(move.san), resultFen);
+        }
+      }
+      console.log("[DEBUG] ANALYSIS no matching move found");
+    } catch (e) {
+      console.error("[DEBUG] ANALYSIS error:", e);
+    }
+    return [model, noCmd];
+  }
+
+  return [model, noCmd];
+};
+
+// =============================================================================
+// Main Update Function
+// =============================================================================
+
 export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
   switch (msg.tag) {
     case "Status":
@@ -205,7 +469,7 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         return [nextModel, noCmd];
       }
       return [
-        nextModel,
+        withStatus(nextModel, "Scanning for diagrams..."),
         [
           {
             tag: "API_DETECT_DIAGRAMS",
@@ -236,35 +500,8 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       };
       return [withStatus(nextModel, `Found ${msg.diagrams.length} potential diagrams`), noCmd];
     }
-    case "DiagramActivated": {
-      if (msg.gameId === null) {
-        return [
-          { ...model, workflow: { tag: "VIEWING", activeGameId: null } },
-          noCmd,
-        ];
-      }
-      const game = model.games.find((g) => g.id === msg.gameId);
-      // If game is confirmed (not pending), go directly to analysis mode
-      if (game && !game.pending) {
-        // Check if analysis tree exists, create if not
-        const tree = model.analyses[msg.gameId] ?? {
-          rootFen: toFullFen(game.fen, "w"), // Default to white's turn
-          nodes: [],
-        };
-        return [
-          {
-            ...model,
-            workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] },
-            analyses: { ...model.analyses, [msg.gameId]: tree },
-          },
-          noCmd,
-        ];
-      }
-      return [
-        { ...model, workflow: { tag: "VIEWING", activeGameId: msg.gameId } },
-        noCmd,
-      ];
-    }
+    case "DiagramActivated":
+      return handleDiagramActivated(model, msg.gameId);
     case "DeleteGame": {
       const filtered = model.games.filter((game) => game.id !== msg.gameId);
       const continuations = Object.fromEntries(
@@ -361,7 +598,7 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
     case "RecognitionFailed":
       return [
         withStatus(
-          { ...model, recognitionInProgress: false },
+          { ...model, recognitionInProgress: null },
           `Recognition error: ${msg.message}`,
         ),
         noCmd,
@@ -430,9 +667,9 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         return [model, noCmd];
       }
       const pending = model.workflow.pending;
-      const placement = String(pending.targetFen);
+      const placement = pending.targetFen;
       // Construct full FEN: placement turn castling en_passant halfmove fullmove
-      const fullFen = `${placement} ${msg.turn} ${msg.castling} - 0 1`;
+      const fullFen = asFenFull(`${placement} ${msg.turn} ${msg.castling} - 0 1`);
       const newGame: Game = {
         id: pending.gameId,
         page: pending.page,
@@ -442,23 +679,22 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         pending: false,
       };
       // Start analysis immediately with the constructed FEN
+      const tree = createAnalysisTree(fullFen, msg.turn);
       return [
         {
           ...model,
           games: [...model.games, newGame],
           workflow: { tag: "ANALYSIS", activeGameId: pending.gameId, cursor: [] },
-          analyses: {
-            ...model.analyses,
-            [pending.gameId]: {
-              rootFen: fullFen as any, // FenFull
-              nodes: [],
-            },
-          },
+          analyses: { ...model.analyses, [pending.gameId]: tree },
           ui: { ...model.ui, settingUpFen: false, statusMessage: "Position set - analyze away!" },
           isDirty: true,
-          placementKeyIndex: { ...model.placementKeyIndex, [placement as any]: pending.gameId },
+          placementKeyIndex: { ...model.placementKeyIndex, [placementKey(placement)]: pending.gameId },
         },
-        [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }],
+        [
+          { tag: "SCHEDULE_SAVE", delayMs: 2000 },
+          { tag: "CHESSNUT_SET_FEN", fen: placement, force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+        ],
       ];
     }
     case "SelectCandidate":
@@ -497,7 +733,15 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         workflow: { tag: "REACHING", session },
         isDirty: true,
       };
-      return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
+      // Auto-start OTB: sync position to board and start polling
+      return [
+        nextModel,
+        [
+          { tag: "SCHEDULE_SAVE", delayMs: 2000 },
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(session.currentFen), force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+        ],
+      ];
     }
     case "StartNewGame": {
       if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -515,7 +759,15 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         workflow: { tag: "REACHING", session },
         isDirty: true,
       };
-      return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
+      // Auto-start OTB: sync position to board and start polling
+      return [
+        nextModel,
+        [
+          { tag: "SCHEDULE_SAVE", delayMs: 2000 },
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(session.currentFen), force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+        ],
+      ];
     }
     case "ReachStartManual":
       if (model.workflow.tag !== "REACHING") {
@@ -532,9 +784,12 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         noCmd,
       ];
     case "ReachStartOtb":
+      console.log("[DEBUG] ReachStartOtb - starting OTB mode");
       if (model.workflow.tag !== "REACHING") {
+        console.log("[DEBUG] ReachStartOtb - not in REACHING, ignoring");
         return [model, noCmd];
       }
+      console.log("[DEBUG] ReachStartOtb - currentFen:", model.workflow.session.currentFen);
       return [
         {
           ...model,
@@ -543,7 +798,11 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
             session: { ...model.workflow.session, mode: "otb" },
           },
         },
-        [{ tag: "CHESSNUT_POLL_START", everyMs: 500 }],
+        [
+          // Sync current position to physical board BEFORE starting to poll
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(model.workflow.session.currentFen), force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 },
+        ],
       ];
     case "ReachMoveMade":
       if (model.workflow.tag !== "REACHING") {
@@ -639,7 +898,6 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
           currentNode: null,
         },
         [
-          { tag: "CLOSE_REACH_MODAL" },
           { tag: "CHESSNUT_POLL_STOP" },
           { tag: "SCHEDULE_SAVE", delayMs: 2000 },
         ],
@@ -669,9 +927,9 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
           : { ...model.analyses, [session.gameId]: tree };
         const continuations = baseId
           ? {
-              ...model.continuations,
-              [session.gameId]: { analysisId: baseId, nodePath: cursor },
-            }
+            ...model.continuations,
+            [session.gameId]: { analysisId: baseId, nodePath: cursor },
+          }
           : model.continuations;
         const nextModel = {
           ...model,
@@ -686,6 +944,8 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
           [
             { tag: "ENGINE_ANALYZE", fen: msg.finalFen, depth: 16 },
             { tag: "SCHEDULE_SAVE", delayMs: 2000 },
+            // Sync new position to board (polling already running)
+            { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(msg.finalFen), force: true },
           ],
         ];
       } catch {
@@ -757,59 +1017,10 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
       ];
     case "ExtractMovesFailed":
       return [withStatus(model, msg.message), noCmd];
-    case "AnalysisStarted": {
-      const position = model.games.find((game) => game.id === msg.gameId);
-      if (!position) {
-        return [model, noCmd];
-      }
-      const continuation = model.continuations[msg.gameId];
-      if (continuation && model.analyses[continuation.analysisId]) {
-        const tree = model.analyses[continuation.analysisId];
-        const node = getNode(tree.root, continuation.nodePath);
-        const fen = node ? node.fen : tree.startFen;
-        const nextModel = {
-          ...model,
-          currentNode: continuation.nodePath,
-          workflow: {
-            tag: "ANALYSIS",
-            activeGameId: msg.gameId,
-            cursor: continuation.nodePath,
-          },
-        };
-        return [nextModel, [{ tag: "ENGINE_ANALYZE", fen, depth: 16 }]];
-      }
-      const fullFen = toFullFen(position.fen, msg.turn);
-      const existing = model.analyses[msg.gameId];
-      const tree = existing ?? createAnalysisTree(fullFen, msg.turn);
-      const nextModel = {
-        ...model,
-        analyses: existing ? model.analyses : { ...model.analyses, [msg.gameId]: tree },
-        currentNode: [],
-        workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] },
-      };
-      return [nextModel, [{ tag: "ENGINE_ANALYZE", fen: fullFen, depth: 16 }]];
-    }
+    case "AnalysisStarted":
+      return handleAnalysisStarted(model, msg.gameId, msg.turn);
     case "AnalysisMoveMade":
-      if (model.workflow.tag !== "ANALYSIS") {
-        return [model, noCmd];
-      }
-      {
-        const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
-        const next = makeMove(ctx.tree, model.workflow.cursor, msg.san, msg.fen);
-        const nextModel = {
-          ...model,
-          analyses: { ...model.analyses, [ctx.analysisId]: next.tree },
-          currentNode: next.cursor,
-          workflow: { ...model.workflow, cursor: next.cursor },
-          isDirty: true,
-        };
-        const cmds = [
-          { tag: "SCHEDULE_SAVE", delayMs: 2000 },
-          ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: msg.fen, depth: 16 }] : []),
-        ];
-        return [nextModel, cmds];
-      }
+      return handleAnalysisMoveMade(model, msg.san, msg.fen);
     case "AnalysisGoBack": {
       if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
       const ctx = getAnalysisContext(model, model.workflow.activeGameId);
@@ -823,9 +1034,10 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         currentNode: nextCursor,
         workflow: { ...model.workflow, cursor: nextCursor },
       };
-      const cmds = model.engine.running
-        ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }]
-        : noCmd;
+      const cmds: Cmd[] = [
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+        ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 } as Cmd] : []),
+      ];
       return [nextModel, cmds];
     }
     case "AnalysisGoForward": {
@@ -841,9 +1053,10 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         currentNode: nextCursor,
         workflow: { ...model.workflow, cursor: nextCursor },
       };
-      const cmds = model.engine.running
-        ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }]
-        : noCmd;
+      const cmds: Cmd[] = [
+        { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+        ...(model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 } as Cmd] : []),
+      ];
       return [nextModel, cmds];
     }
     case "AnalysisNextVariation": {
@@ -894,6 +1107,19 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         isDirty: true,
       };
       return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
+    }
+    case "AnalysisPromoteVariation": {
+      if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+      const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+      if (!ctx) return [model, noCmd];
+      const result = promoteVariation(ctx.tree, model.workflow.cursor);
+      if (!result.promoted) return [model, noCmd];
+      const nextModel: Model = {
+        ...model,
+        analyses: { ...model.analyses, [ctx.analysisId]: result.tree },
+        isDirty: true,
+      };
+      return [withStatus(nextModel, "Variation promoted to main line"), [{ tag: "SCHEDULE_SAVE", delayMs: 2000 }]];
     }
     case "AnalysisGoTo": {
       if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
@@ -956,45 +1182,7 @@ export const update = (model: Model = initialModel, msg: Msg): UpdateResult => {
         noCmd,
       ];
     case "BoardFenUpdated":
-      if (model.workflow.tag !== "REACHING") {
-        return [model, noCmd];
-      }
-      if (model.workflow.session.mode !== "otb") {
-        return [model, noCmd];
-      }
-      try {
-        const currentPlacement = extractPlacement(model.workflow.session.currentFen);
-        const nextPlacement = extractPlacement(msg.fen);
-        if (currentPlacement === nextPlacement) {
-          return [model, noCmd];
-        }
-        const baseGame = new Chess(model.workflow.session.currentFen);
-        const moves = baseGame.moves({ verbose: true });
-        for (const move of moves) {
-          const testGame = new Chess(model.workflow.session.currentFen);
-          testGame.move(move);
-          const resultFen = asFenFull(testGame.fen());
-          if (extractPlacement(resultFen) === nextPlacement) {
-            return [
-              {
-                ...model,
-                workflow: {
-                  ...model.workflow,
-                  session: {
-                    ...model.workflow.session,
-                    moves: [...model.workflow.session.moves, asSan(move.san)],
-                    currentFen: resultFen,
-                  },
-                },
-              },
-              noCmd,
-            ];
-          }
-        }
-      } catch {
-        return [model, noCmd];
-      }
-      return [model, noCmd];
+      return handleBoardFenUpdated(model, msg.fen);
     case "CopyFen":
       {
         const activeId = getActiveGameId(model.workflow);

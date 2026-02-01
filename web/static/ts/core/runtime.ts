@@ -116,23 +116,23 @@ export const createRuntime = (initial: Model) => {
       const onDrop =
         mode === "analysis"
           ? (source: string, target: string) => {
-              if (!resources.analysisGame) return "snapback";
-              const move = resources.analysisGame.move({
-                from: source,
-                to: target,
-                promotion: "q",
-              });
-              if (!move) return "snapback";
-              dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.analysisGame.fen()) });
-              return undefined;
-            }
+            if (!resources.analysisGame) return "snapback";
+            const move = resources.analysisGame.move({
+              from: source,
+              to: target,
+              promotion: "q",
+            });
+            if (!move) return "snapback";
+            dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.analysisGame.fen()) });
+            return undefined;
+          }
           : undefined;
       const onSnapEnd =
         mode === "analysis"
           ? () => {
-              if (!resources.analysisGame || !resources.previewBoard) return;
-              resources.previewBoard.position(resources.analysisGame.fen());
-            }
+            if (!resources.analysisGame || !resources.previewBoard) return;
+            resources.previewBoard.position(resources.analysisGame.fen());
+          }
           : undefined;
       resources.previewBoard = createBoard("active-board", {
         position: String(boardFen),
@@ -167,8 +167,9 @@ export const createRuntime = (initial: Model) => {
     const workflow = model.workflow;
     const isEditing = model.ui.editingPosition;
     const isSettingUpFen = model.ui.settingUpFen;
-    // Include editing/fenSetup state in mode key so board is recreated when these change
-    const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "");
+    const orientation = model.ui.boardOrientation;
+    // Include editing/fenSetup/orientation state in mode key so board is recreated when these change
+    const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "") + `-${orientation}`;
 
     // Destroy boards if mode changes or workflow closes
     if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {
@@ -200,6 +201,7 @@ export const createRuntime = (initial: Model) => {
             sparePieces: isEditing,
             showNotation: false,
             pieceTheme,
+            orientation,
           });
           resources.boardRow.before = null;
           resources.boardRow.after = null;
@@ -216,6 +218,7 @@ export const createRuntime = (initial: Model) => {
               draggable: false,
               showNotation: false,
               pieceTheme,
+              orientation,
             });
           }
           resources.boardRow.now = createBoard("now-board", {
@@ -223,6 +226,7 @@ export const createRuntime = (initial: Model) => {
             draggable: false,
             showNotation: false,
             pieceTheme,
+            orientation,
           });
           resources.boardRow.after = null;
           break;
@@ -238,6 +242,7 @@ export const createRuntime = (initial: Model) => {
             draggable: false,
             showNotation: false,
             pieceTheme,
+            orientation,
           });
 
           // Now (interactive entry board)
@@ -267,6 +272,7 @@ export const createRuntime = (initial: Model) => {
             draggable: true,
             showNotation: true,
             pieceTheme,
+            orientation,
             onDragStart,
             onDrop,
             onSnapEnd,
@@ -278,6 +284,7 @@ export const createRuntime = (initial: Model) => {
             draggable: false,
             showNotation: false,
             pieceTheme,
+            orientation,
           });
           break;
         }
@@ -320,6 +327,7 @@ export const createRuntime = (initial: Model) => {
             draggable: true,
             showNotation: true,
             pieceTheme,
+            orientation,
             onDrop,
             onSnapEnd,
           });
@@ -568,11 +576,13 @@ export const createRuntime = (initial: Model) => {
         return;
       }
       case "CHESSNUT_POLL_START": {
+        console.log("[DEBUG] CHESSNUT_POLL_START - starting poll every", cmd.everyMs, "ms");
         if (resources.chessnutPollTimer) {
           window.clearInterval(resources.chessnutPollTimer);
         }
         const timer = window.setInterval(async () => {
           const result = await fetchFen();
+          console.log("[DEBUG] fetchFen result:", result);
           if (result.ok) {
             dispatch({ tag: "BoardFenUpdated", fen: result.value });
           }

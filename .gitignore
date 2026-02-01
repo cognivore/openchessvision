@@ -70,3 +70,4 @@ runs/
 # Temporary files
 *.tmp
 *.bak
+web/node_modules/

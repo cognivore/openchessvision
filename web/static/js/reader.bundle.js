@@ -82,7 +82,8 @@
     let current = root;
     for (const san of path) {
       const next = current.children.find((child) => child.san === san) ?? null;
-      if (!next) return null;
+      if (!next)
+        return null;
       current = next;
     }
     return current;
@@ -93,9 +94,11 @@
     }
     const [head, ...rest] = path;
     const nextIndex = node.children.findIndex((child) => child.san === head);
-    if (nextIndex === -1) return node;
+    if (nextIndex === -1)
+      return node;
     const updatedChild = updateNodeAtPath(node.children[nextIndex], rest, updater);
-    if (updatedChild === node.children[nextIndex]) return node;
+    if (updatedChild === node.children[nextIndex])
+      return node;
     const updatedChildren = node.children.map(
       (child, idx) => idx === nextIndex ? updatedChild : child
     );
@@ -121,41 +124,53 @@
   var goBack = (cursor) => cursor.length === 0 ? null : cursor.slice(0, -1);
   var goForward = (tree, cursor) => {
     const node = getNode(tree.root, cursor);
-    if (!node || node.children.length === 0) return null;
+    if (!node || node.children.length === 0)
+      return null;
     const nextSan = node.children[0].san;
-    if (!nextSan) return null;
+    if (!nextSan)
+      return null;
     return [...cursor, nextSan];
   };
   var getNextVariation = (tree, cursor) => {
-    if (cursor.length === 0) return null;
+    if (cursor.length === 0)
+      return null;
     const parentPath = cursor.slice(0, -1);
     const currentSan = cursor[cursor.length - 1];
     const parent = getNode(tree.root, parentPath);
-    if (!parent) return null;
+    if (!parent)
+      return null;
     const idx = parent.children.findIndex((child) => child.san === currentSan);
-    if (idx === -1 || idx >= parent.children.length - 1) return null;
+    if (idx === -1 || idx >= parent.children.length - 1)
+      return null;
     const nextSan = parent.children[idx + 1].san;
-    if (!nextSan) return null;
+    if (!nextSan)
+      return null;
     return [...parentPath, nextSan];
   };
   var getPrevVariation = (tree, cursor) => {
-    if (cursor.length === 0) return null;
+    if (cursor.length === 0)
+      return null;
     const parentPath = cursor.slice(0, -1);
     const currentSan = cursor[cursor.length - 1];
     const parent = getNode(tree.root, parentPath);
-    if (!parent) return null;
+    if (!parent)
+      return null;
     const idx = parent.children.findIndex((child) => child.san === currentSan);
-    if (idx <= 0) return null;
+    if (idx <= 0)
+      return null;
     const prevSan = parent.children[idx - 1].san;
-    if (!prevSan) return null;
+    if (!prevSan)
+      return null;
     return [...parentPath, prevSan];
   };
   var deleteVariation = (tree, cursor) => {
-    if (cursor.length === 0) return { tree, cursor, deleted: false };
+    if (cursor.length === 0)
+      return { tree, cursor, deleted: false };
     const parentPath = cursor.slice(0, -1);
     const currentSan = cursor[cursor.length - 1];
     const parent = getNode(tree.root, parentPath);
-    if (!parent) return { tree, cursor, deleted: false };
+    if (!parent)
+      return { tree, cursor, deleted: false };
     const nextChildren = parent.children.filter((child) => child.san !== currentSan);
     if (nextChildren.length === parent.children.length) {
       return { tree, cursor, deleted: false };
@@ -167,12 +182,37 @@
     const nextCursor = nextChildren.length > 0 && nextChildren[0].san ? [...parentPath, nextChildren[0].san] : parentPath;
     return { tree: { ...tree, root: nextRoot }, cursor: nextCursor, deleted: true };
   };
+  var promoteVariation = (tree, cursor) => {
+    if (cursor.length === 0)
+      return { tree, promoted: false };
+    const parentPath = cursor.slice(0, -1);
+    const currentSan = cursor[cursor.length - 1];
+    const parent = getNode(tree.root, parentPath);
+    if (!parent)
+      return { tree, promoted: false };
+    const idx = parent.children.findIndex((child) => child.san === currentSan);
+    if (idx === -1 || idx === 0) {
+      return { tree, promoted: false };
+    }
+    const currentChild = parent.children[idx];
+    const reorderedChildren = [
+      currentChild,
+      ...parent.children.slice(0, idx),
+      ...parent.children.slice(idx + 1)
+    ];
+    const nextRoot = updateNodeAtPath(tree.root, parentPath, (node) => ({
+      ...node,
+      children: reorderedChildren
+    }));
+    return { tree: { ...tree, root: nextRoot }, promoted: true };
+  };
   var getMainLineLeaf = (tree) => {
     let node = tree.root;
     const path = [];
     while (node.children.length > 0) {
       const child = node.children[0];
-      if (!child.san) break;
+      if (!child.san)
+        break;
       path.push(child.san);
       node = child;
     }
@@ -187,7 +227,8 @@
       const mainChild = node.children[0];
       const nextIsWhite = !isWhite;
       const nextMoveNum = isWhite ? moveNum : moveNum + 1;
-      if (result) result += " ";
+      if (result)
+        result += " ";
       result += renderNode(mainChild, nextMoveNum, nextIsWhite);
       for (let i = 1; i < node.children.length; i += 1) {
         const variation = node.children[i];
@@ -299,7 +340,8 @@
   };
   var getActiveGame = (model) => {
     const id = getActiveGameId(model.workflow);
-    if (!id) return null;
+    if (!id)
+      return null;
     return model.games.find((game) => game.id === id) ?? null;
   };
   var getAnalysisContext = (model, gameId) => {
@@ -324,7 +366,8 @@
   };
   var getAnalysisNodeFen = (model, gameId) => {
     const ctx = getAnalysisContext(model, gameId);
-    if (!ctx) return null;
+    if (!ctx)
+      return null;
     const node = getNode(ctx.tree.root, ctx.nodePath);
     return node ? node.fen : null;
   };
@@ -408,6 +451,225 @@
       turn: "w"
     };
   };
+  var handleAnalysisStarted = (model, gameId, turn) => {
+    const position = model.games.find((game) => game.id === gameId);
+    if (!position) {
+      return [model, noCmd];
+    }
+    const continuation = model.continuations[gameId];
+    const linkedTree = continuation ? model.analyses[continuation.analysisId] : void 0;
+    if (continuation && linkedTree) {
+      const node = getNode(linkedTree.root, continuation.nodePath);
+      const fen = node ? node.fen : linkedTree.startFen;
+      const nextModel2 = {
+        ...model,
+        currentNode: continuation.nodePath,
+        workflow: {
+          tag: "ANALYSIS",
+          activeGameId: gameId,
+          cursor: continuation.nodePath
+        }
+      };
+      return [
+        nextModel2,
+        [
+          { tag: "ENGINE_ANALYZE", fen, depth: 16 },
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+        ]
+      ];
+    }
+    const fullFen = toFullFen(position.fen, turn);
+    const existing = model.analyses[gameId];
+    const tree = existing ?? createAnalysisTree(fullFen, turn);
+    const nextModel = {
+      ...model,
+      analyses: existing ? model.analyses : { ...model.analyses, [gameId]: tree },
+      currentNode: [],
+      workflow: { tag: "ANALYSIS", activeGameId: gameId, cursor: [] }
+    };
+    return [
+      nextModel,
+      [
+        { tag: "ENGINE_ANALYZE", fen: fullFen, depth: 16 },
+        { tag: "CHESSNUT_SET_FEN", fen: position.fen, force: true },
+        { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+      ]
+    ];
+  };
+  var handleAnalysisMoveMade = (model, san, fen) => {
+    if (model.workflow.tag !== "ANALYSIS") {
+      return [model, noCmd];
+    }
+    const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+    if (!ctx)
+      return [model, noCmd];
+    const next = makeMove(ctx.tree, model.workflow.cursor, san, fen);
+    const nextModel = {
+      ...model,
+      analyses: { ...model.analyses, [ctx.analysisId]: next.tree },
+      currentNode: next.cursor,
+      workflow: { ...model.workflow, cursor: next.cursor },
+      isDirty: true
+    };
+    const cmds = [
+      { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
+      { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+      ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen, depth: 16 }] : []
+    ];
+    return [nextModel, cmds];
+  };
+  var handleDiagramActivated = (model, gameId) => {
+    console.log("[DEBUG] DiagramActivated:", { gameId });
+    if (gameId === null) {
+      console.log("[DEBUG] DiagramActivated: closing (gameId is null)");
+      return [
+        { ...model, workflow: { tag: "VIEWING", activeGameId: null } },
+        noCmd
+      ];
+    }
+    const game = model.games.find((g) => g.id === gameId);
+    console.log("[DEBUG] DiagramActivated: found game:", game);
+    if (!game) {
+      console.log("[DEBUG] DiagramActivated: game not found, returning");
+      return [model, noCmd];
+    }
+    const continuation = model.continuations[gameId];
+    console.log("[DEBUG] DiagramActivated: continuation:", continuation);
+    const continuationTree = continuation ? model.analyses[continuation.analysisId] : void 0;
+    if (continuation && continuationTree) {
+      console.log("[DEBUG] DiagramActivated: resuming continuation");
+      const node = getNode(continuationTree.root, continuation.nodePath);
+      const fen = node ? asFenFull(node.fen) : continuationTree.startFen;
+      return [
+        {
+          ...model,
+          currentNode: continuation.nodePath,
+          workflow: {
+            tag: "ANALYSIS",
+            activeGameId: gameId,
+            cursor: continuation.nodePath
+          }
+        },
+        [
+          { tag: "ENGINE_ANALYZE", fen, depth: 16 },
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(fen), force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+        ]
+      ];
+    }
+    console.log("[DEBUG] DiagramActivated: game.pending =", game.pending);
+    if (!game.pending) {
+      console.log("[DEBUG] DiagramActivated: going to ANALYSIS mode (not pending)");
+      const fullFen = toFullFen(game.fen, "w");
+      const tree = model.analyses[gameId] ?? createAnalysisTree(fullFen, "w");
+      return [
+        {
+          ...model,
+          workflow: { tag: "ANALYSIS", activeGameId: gameId, cursor: [] },
+          analyses: { ...model.analyses, [gameId]: tree }
+        },
+        [
+          { tag: "CHESSNUT_SET_FEN", fen: game.fen, force: true },
+          { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+        ]
+      ];
+    }
+    console.log("[DEBUG] DiagramActivated: game is pending, going to PENDING_CONFIRM");
+    return [
+      {
+        ...model,
+        workflow: {
+          tag: "PENDING_CONFIRM",
+          pending: {
+            gameId: game.id,
+            targetFen: game.fen,
+            page: game.page,
+            bbox: game.bbox,
+            confidence: game.confidence
+          }
+        }
+      },
+      noCmd
+    ];
+  };
+  var handleBoardFenUpdated = (model, fen) => {
+    console.log("[DEBUG] BoardFenUpdated:", fen);
+    console.log("[DEBUG] workflow.tag:", model.workflow.tag);
+    if (model.workflow.tag === "REACHING") {
+      try {
+        const currentPlacement = extractPlacement(model.workflow.session.currentFen);
+        const nextPlacement = extractPlacement(fen);
+        console.log("[DEBUG] REACHING currentPlacement:", currentPlacement);
+        console.log("[DEBUG] REACHING nextPlacement:", nextPlacement);
+        if (currentPlacement === nextPlacement) {
+          return [model, noCmd];
+        }
+        const baseGame = new Chess(model.workflow.session.currentFen);
+        const moves = baseGame.moves({ verbose: true });
+        for (const move of moves) {
+          const testGame = new Chess(model.workflow.session.currentFen);
+          testGame.move(move);
+          const resultFen = asFenFull(testGame.fen());
+          if (extractPlacement(resultFen) === nextPlacement) {
+            console.log("[DEBUG] REACHING found move:", move.san);
+            return [
+              {
+                ...model,
+                workflow: {
+                  ...model.workflow,
+                  session: {
+                    ...model.workflow.session,
+                    moves: [...model.workflow.session.moves, asSan(move.san)],
+                    currentFen: resultFen
+                  }
+                }
+              },
+              noCmd
+            ];
+          }
+        }
+        console.log("[DEBUG] REACHING no matching move found");
+      } catch (e) {
+        console.error("[DEBUG] REACHING error:", e);
+      }
+      return [model, noCmd];
+    }
+    if (model.workflow.tag === "ANALYSIS") {
+      const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+      if (!ctx) {
+        console.log("[DEBUG] ANALYSIS no context");
+        return [model, noCmd];
+      }
+      const currentNode = getNode(ctx.tree.root, ctx.nodePath);
+      const currentFen = currentNode ? asFenFull(currentNode.fen) : ctx.tree.startFen;
+      const currentPlacement = extractPlacement(currentFen);
+      const nextPlacement = extractPlacement(fen);
+      console.log("[DEBUG] ANALYSIS currentPlacement:", currentPlacement);
+      console.log("[DEBUG] ANALYSIS nextPlacement:", nextPlacement);
+      if (currentPlacement === nextPlacement) {
+        return [model, noCmd];
+      }
+      try {
+        const baseGame = new Chess(currentFen);
+        const moves = baseGame.moves({ verbose: true });
+        for (const move of moves) {
+          const testGame = new Chess(currentFen);
+          testGame.move(move);
+          const resultFen = asFenFull(testGame.fen());
+          if (extractPlacement(resultFen) === nextPlacement) {
+            console.log("[DEBUG] ANALYSIS found move:", move.san);
+            return handleAnalysisMoveMade(model, asSan(move.san), resultFen);
+          }
+        }
+        console.log("[DEBUG] ANALYSIS no matching move found");
+      } catch (e) {
+        console.error("[DEBUG] ANALYSIS error:", e);
+      }
+      return [model, noCmd];
+    }
+    return [model, noCmd];
+  };
   var update = (model = initialModel, msg) => {
     switch (msg.tag) {
       case "Status":
@@ -478,7 +740,7 @@
           return [nextModel, noCmd];
         }
         return [
-          nextModel,
+          withStatus(nextModel, "Scanning for diagrams..."),
           [
             {
               tag: "API_DETECT_DIAGRAMS",
@@ -509,39 +771,14 @@
         };
         return [withStatus(nextModel, `Found ${msg.diagrams.length} potential diagrams`), noCmd];
       }
-      case "DiagramActivated": {
-        if (msg.gameId === null) {
-          return [
-            { ...model, workflow: { tag: "VIEWING", activeGameId: null } },
-            noCmd
-          ];
-        }
-        const game = model.games.find((g) => g.id === msg.gameId);
-        if (game && !game.pending) {
-          const tree = model.analyses[msg.gameId] ?? {
-            rootFen: toFullFen(game.fen, "w"),
-            // Default to white's turn
-            nodes: []
-          };
-          return [
-            {
-              ...model,
-              workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] },
-              analyses: { ...model.analyses, [msg.gameId]: tree }
-            },
-            noCmd
-          ];
-        }
-        return [
-          { ...model, workflow: { tag: "VIEWING", activeGameId: msg.gameId } },
-          noCmd
-        ];
-      }
+      case "DiagramActivated":
+        return handleDiagramActivated(model, msg.gameId);
       case "DeleteGame": {
         const filtered2 = model.games.filter((game) => game.id !== msg.gameId);
         const continuations = Object.fromEntries(
           Object.entries(model.continuations).filter(([key, link]) => {
-            if (key === msg.gameId) return false;
+            if (key === msg.gameId)
+              return false;
             return link.analysisId !== msg.gameId;
           })
         );
@@ -632,7 +869,7 @@
       case "RecognitionFailed":
         return [
           withStatus(
-            { ...model, recognitionInProgress: false },
+            { ...model, recognitionInProgress: null },
             `Recognition error: ${msg.message}`
           ),
           noCmd
@@ -701,8 +938,8 @@
           return [model, noCmd];
         }
         const pending = model.workflow.pending;
-        const placement = String(pending.targetFen);
-        const fullFen = `${placement} ${msg.turn} ${msg.castling} - 0 1`;
+        const placement = pending.targetFen;
+        const fullFen = asFenFull(`${placement} ${msg.turn} ${msg.castling} - 0 1`);
         const newGame = {
           id: pending.gameId,
           page: pending.page,
@@ -711,24 +948,22 @@
           confidence: pending.confidence,
           pending: false
         };
+        const tree = createAnalysisTree(fullFen, msg.turn);
         return [
           {
             ...model,
             games: [...model.games, newGame],
             workflow: { tag: "ANALYSIS", activeGameId: pending.gameId, cursor: [] },
-            analyses: {
-              ...model.analyses,
-              [pending.gameId]: {
-                rootFen: fullFen,
-                // FenFull
-                nodes: []
-              }
-            },
+            analyses: { ...model.analyses, [pending.gameId]: tree },
             ui: { ...model.ui, settingUpFen: false, statusMessage: "Position set - analyze away!" },
             isDirty: true,
-            placementKeyIndex: { ...model.placementKeyIndex, [placement]: pending.gameId }
+            placementKeyIndex: { ...model.placementKeyIndex, [placementKey(placement)]: pending.gameId }
           },
-          [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]
+          [
+            { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
+            { tag: "CHESSNUT_SET_FEN", fen: placement, force: true },
+            { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+          ]
         ];
       }
       case "SelectCandidate":
@@ -767,7 +1002,14 @@
           workflow: { tag: "REACHING", session },
           isDirty: true
         };
-        return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
+        return [
+          nextModel,
+          [
+            { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
+            { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(session.currentFen), force: true },
+            { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+          ]
+        ];
       }
       case "StartNewGame": {
         if (model.workflow.tag !== "MATCH_EXISTING") {
@@ -785,7 +1027,14 @@
           workflow: { tag: "REACHING", session },
           isDirty: true
         };
-        return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
+        return [
+          nextModel,
+          [
+            { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
+            { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(session.currentFen), force: true },
+            { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+          ]
+        ];
       }
       case "ReachStartManual":
         if (model.workflow.tag !== "REACHING") {
@@ -802,9 +1051,12 @@
           noCmd
         ];
       case "ReachStartOtb":
+        console.log("[DEBUG] ReachStartOtb - starting OTB mode");
         if (model.workflow.tag !== "REACHING") {
+          console.log("[DEBUG] ReachStartOtb - not in REACHING, ignoring");
           return [model, noCmd];
         }
+        console.log("[DEBUG] ReachStartOtb - currentFen:", model.workflow.session.currentFen);
         return [
           {
             ...model,
@@ -813,7 +1065,11 @@
               session: { ...model.workflow.session, mode: "otb" }
             }
           },
-          [{ tag: "CHESSNUT_POLL_START", everyMs: 500 }]
+          [
+            // Sync current position to physical board BEFORE starting to poll
+            { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(model.workflow.session.currentFen), force: true },
+            { tag: "CHESSNUT_POLL_START", everyMs: 500 }
+          ]
         ];
       case "ReachMoveMade":
         if (model.workflow.tag !== "REACHING") {
@@ -844,7 +1100,8 @@
           const remaining = model.workflow.session.moves.slice(0, -1);
           const game = new Chess(model.workflow.session.startFen);
           for (const san of remaining) {
-            if (!game.move(String(san))) break;
+            if (!game.move(String(san)))
+              break;
           }
           return [
             {
@@ -909,7 +1166,6 @@
             currentNode: null
           },
           [
-            { tag: "CLOSE_REACH_MODAL" },
             { tag: "CHESSNUT_POLL_STOP" },
             { tag: "SCHEDULE_SAVE", delayMs: 2e3 }
           ]
@@ -926,7 +1182,8 @@
           const game = new Chess(session.startFen);
           for (const san of msg.moves) {
             const move = game.move(String(san));
-            if (!move) break;
+            if (!move)
+              break;
             const next = makeMove(tree, cursor, asSan(move.san), asFenFull(game.fen()));
             tree = next.tree;
             cursor = next.cursor;
@@ -948,7 +1205,9 @@
             nextModel,
             [
               { tag: "ENGINE_ANALYZE", fen: msg.finalFen, depth: 16 },
-              { tag: "SCHEDULE_SAVE", delayMs: 2e3 }
+              { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
+              // Sync new position to board (polling already running)
+              { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(msg.finalFen), force: true }
             ]
           ];
         } catch {
@@ -1014,99 +1273,68 @@
         ];
       case "ExtractMovesFailed":
         return [withStatus(model, msg.message), noCmd];
-      case "AnalysisStarted": {
-        const position = model.games.find((game) => game.id === msg.gameId);
-        if (!position) {
-          return [model, noCmd];
-        }
-        const continuation = model.continuations[msg.gameId];
-        if (continuation && model.analyses[continuation.analysisId]) {
-          const tree2 = model.analyses[continuation.analysisId];
-          const node = getNode(tree2.root, continuation.nodePath);
-          const fen = node ? node.fen : tree2.startFen;
-          const nextModel2 = {
-            ...model,
-            currentNode: continuation.nodePath,
-            workflow: {
-              tag: "ANALYSIS",
-              activeGameId: msg.gameId,
-              cursor: continuation.nodePath
-            }
-          };
-          return [nextModel2, [{ tag: "ENGINE_ANALYZE", fen, depth: 16 }]];
-        }
-        const fullFen = toFullFen(position.fen, msg.turn);
-        const existing = model.analyses[msg.gameId];
-        const tree = existing ?? createAnalysisTree(fullFen, msg.turn);
-        const nextModel = {
-          ...model,
-          analyses: existing ? model.analyses : { ...model.analyses, [msg.gameId]: tree },
-          currentNode: [],
-          workflow: { tag: "ANALYSIS", activeGameId: msg.gameId, cursor: [] }
-        };
-        return [nextModel, [{ tag: "ENGINE_ANALYZE", fen: fullFen, depth: 16 }]];
-      }
+      case "AnalysisStarted":
+        return handleAnalysisStarted(model, msg.gameId, msg.turn);
       case "AnalysisMoveMade":
-        if (model.workflow.tag !== "ANALYSIS") {
-          return [model, noCmd];
-        }
-        {
-          const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-          if (!ctx) return [model, noCmd];
-          const next = makeMove(ctx.tree, model.workflow.cursor, msg.san, msg.fen);
-          const nextModel = {
-            ...model,
-            analyses: { ...model.analyses, [ctx.analysisId]: next.tree },
-            currentNode: next.cursor,
-            workflow: { ...model.workflow, cursor: next.cursor },
-            isDirty: true
-          };
-          const cmds = [
-            { tag: "SCHEDULE_SAVE", delayMs: 2e3 },
-            ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: msg.fen, depth: 16 }] : []
-          ];
-          return [nextModel, cmds];
-        }
+        return handleAnalysisMoveMade(model, msg.san, msg.fen);
       case "AnalysisGoBack": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const nextCursor = goBack(model.workflow.cursor);
-        if (!nextCursor) return [model, noCmd];
+        if (!nextCursor)
+          return [model, noCmd];
         const node = getNode(ctx.tree.root, nextCursor);
-        if (!node) return [model, noCmd];
+        if (!node)
+          return [model, noCmd];
         const nextModel = {
           ...model,
           currentNode: nextCursor,
           workflow: { ...model.workflow, cursor: nextCursor }
         };
-        const cmds = model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd;
+        const cmds = [
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+          ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : []
+        ];
         return [nextModel, cmds];
       }
       case "AnalysisGoForward": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const nextCursor = goForward(ctx.tree, model.workflow.cursor);
-        if (!nextCursor) return [model, noCmd];
+        if (!nextCursor)
+          return [model, noCmd];
         const node = getNode(ctx.tree.root, nextCursor);
-        if (!node) return [model, noCmd];
+        if (!node)
+          return [model, noCmd];
         const nextModel = {
           ...model,
           currentNode: nextCursor,
           workflow: { ...model.workflow, cursor: nextCursor }
         };
-        const cmds = model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : noCmd;
+        const cmds = [
+          { tag: "CHESSNUT_SET_FEN", fen: extractPlacement(node.fen), force: true },
+          ...model.engine.running ? [{ tag: "ENGINE_ANALYZE", fen: node.fen, depth: 16 }] : []
+        ];
         return [nextModel, cmds];
       }
       case "AnalysisNextVariation": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const nextCursor = getNextVariation(ctx.tree, model.workflow.cursor);
-        if (!nextCursor) return [model, noCmd];
+        if (!nextCursor)
+          return [model, noCmd];
         const node = getNode(ctx.tree.root, nextCursor);
-        if (!node) return [model, noCmd];
+        if (!node)
+          return [model, noCmd];
         return [
           {
             ...model,
@@ -1117,13 +1345,17 @@
         ];
       }
       case "AnalysisPrevVariation": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const nextCursor = getPrevVariation(ctx.tree, model.workflow.cursor);
-        if (!nextCursor) return [model, noCmd];
+        if (!nextCursor)
+          return [model, noCmd];
         const node = getNode(ctx.tree.root, nextCursor);
-        if (!node) return [model, noCmd];
+        if (!node)
+          return [model, noCmd];
         return [
           {
             ...model,
@@ -1134,11 +1366,14 @@
         ];
       }
       case "AnalysisDeleteVariation": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const result = deleteVariation(ctx.tree, model.workflow.cursor);
-        if (!result.deleted) return [model, noCmd];
+        if (!result.deleted)
+          return [model, noCmd];
         const nextModel = {
           ...model,
           analyses: { ...model.analyses, [ctx.analysisId]: result.tree },
@@ -1148,12 +1383,31 @@
         };
         return [nextModel, [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
       }
-      case "AnalysisGoTo": {
-        if (model.workflow.tag !== "ANALYSIS") return [model, noCmd];
+      case "AnalysisPromoteVariation": {
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, model.workflow.activeGameId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
+        const result = promoteVariation(ctx.tree, model.workflow.cursor);
+        if (!result.promoted)
+          return [model, noCmd];
+        const nextModel = {
+          ...model,
+          analyses: { ...model.analyses, [ctx.analysisId]: result.tree },
+          isDirty: true
+        };
+        return [withStatus(nextModel, "Variation promoted to main line"), [{ tag: "SCHEDULE_SAVE", delayMs: 2e3 }]];
+      }
+      case "AnalysisGoTo": {
+        if (model.workflow.tag !== "ANALYSIS")
+          return [model, noCmd];
+        const ctx = getAnalysisContext(model, model.workflow.activeGameId);
+        if (!ctx)
+          return [model, noCmd];
         const node = getNode(ctx.tree.root, msg.path);
-        if (!node) return [model, noCmd];
+        if (!node)
+          return [model, noCmd];
         const nextModel = {
           ...model,
           currentNode: msg.path,
@@ -1207,45 +1461,7 @@
           noCmd
         ];
       case "BoardFenUpdated":
-        if (model.workflow.tag !== "REACHING") {
-          return [model, noCmd];
-        }
-        if (model.workflow.session.mode !== "otb") {
-          return [model, noCmd];
-        }
-        try {
-          const currentPlacement = extractPlacement(model.workflow.session.currentFen);
-          const nextPlacement = extractPlacement(msg.fen);
-          if (currentPlacement === nextPlacement) {
-            return [model, noCmd];
-          }
-          const baseGame = new Chess(model.workflow.session.currentFen);
-          const moves = baseGame.moves({ verbose: true });
-          for (const move of moves) {
-            const testGame = new Chess(model.workflow.session.currentFen);
-            testGame.move(move);
-            const resultFen = asFenFull(testGame.fen());
-            if (extractPlacement(resultFen) === nextPlacement) {
-              return [
-                {
-                  ...model,
-                  workflow: {
-                    ...model.workflow,
-                    session: {
-                      ...model.workflow.session,
-                      moves: [...model.workflow.session.moves, asSan(move.san)],
-                      currentFen: resultFen
-                    }
-                  }
-                },
-                noCmd
-              ];
-            }
-          }
-        } catch {
-          return [model, noCmd];
-        }
-        return [model, noCmd];
+        return handleBoardFenUpdated(model, msg.fen);
       case "CopyFen": {
         const activeId = getActiveGameId(model.workflow);
         const ctx = activeId ? getAnalysisContext(model, activeId) : null;
@@ -1260,9 +1476,11 @@
       }
       case "CopyPgn": {
         const activeId = getActiveGameId(model.workflow);
-        if (!activeId) return [model, noCmd];
+        if (!activeId)
+          return [model, noCmd];
         const ctx = getAnalysisContext(model, activeId);
-        if (!ctx) return [model, noCmd];
+        if (!ctx)
+          return [model, noCmd];
         const pgn = toPGN(ctx.tree);
         return [model, [{ tag: "CLIPBOARD_WRITE", text: pgn }]];
       }
@@ -1473,7 +1691,8 @@
     document.addEventListener("mouseup", endResize);
   };
   var doResize = (event) => {
-    if (!resizeState) return;
+    if (!resizeState)
+      return;
     const dx = event.clientX - resizeState.startX;
     const dy = event.clientY - resizeState.startY;
     const { origX, origY, origW, origH } = resizeState;
@@ -1503,7 +1722,8 @@
     }
   };
   var endResize = () => {
-    if (!resizeState) return;
+    if (!resizeState)
+      return;
     const { rect, onResize } = resizeState;
     resizeState = null;
     document.removeEventListener("mousemove", doResize);
@@ -1600,16 +1820,41 @@
     const textEl = els.boardStatus.querySelector(".board-status-text");
     if (connected) {
       els.boardStatus.classList.add("connected");
-      if (textEl) textEl.textContent = "\u265F Board ready";
+      if (textEl)
+        textEl.textContent = "\u265F Board ready";
     } else if (available) {
       els.boardStatus.classList.add("online");
-      if (textEl) textEl.textContent = "\u26A0 No board";
+      if (textEl)
+        textEl.textContent = "\u26A0 No board";
     } else {
       els.boardStatus.classList.add("offline");
-      if (textEl) textEl.textContent = "\u25CB Offline";
+      if (textEl)
+        textEl.textContent = "\u25CB Offline";
     }
   };
+  var lastPositionsSignature = "";
+  var computePositionsSignature = (model) => {
+    const visibleGames = model.games.filter((game) => !game.pending);
+    const activeId = getActiveGameId(model.workflow);
+    const parts = visibleGames.map((game) => {
+      const hasAnalysis = Boolean(model.analyses[game.id] || model.continuations[game.id]);
+      const isActive = activeId === game.id;
+      return `${game.id}:${game.page}:${game.fen}:${isActive}:${hasAnalysis}`;
+    });
+    return `${activeId ?? "none"}|${parts.join(",")}`;
+  };
   var renderPositions = (model, dispatch) => {
+    const signature = computePositionsSignature(model);
+    if (signature === lastPositionsSignature) {
+      const activeId2 = getActiveGameId(model.workflow);
+      els.positionList.querySelectorAll(".position-item").forEach((item) => {
+        const el = item;
+        const id = el.dataset.id;
+        el.classList.toggle("active", id === activeId2);
+      });
+      return;
+    }
+    lastPositionsSignature = signature;
     els.positionList.innerHTML = "";
     const visibleGames = model.games.filter((game) => !game.pending);
     const activeId = getActiveGameId(model.workflow);
@@ -1697,12 +1942,14 @@
   var renderAnalysis = (model, dispatch) => {
     const noAnalysis = els.analysisContainer.querySelector(".no-analysis");
     if (model.workflow.tag !== "ANALYSIS") {
-      if (noAnalysis) toggleHidden(noAnalysis, true);
+      if (noAnalysis)
+        toggleHidden(noAnalysis, true);
       toggleHidden(els.pgnViewer, false);
       toggleHidden(els.enginePanel, false);
       return;
     }
-    if (noAnalysis) toggleHidden(noAnalysis, false);
+    if (noAnalysis)
+      toggleHidden(noAnalysis, false);
     toggleHidden(els.pgnViewer, true);
     toggleHidden(els.enginePanel, true);
     els.engineEval.textContent = model.engine.evalText;
@@ -1719,7 +1966,8 @@
     const renderTree = (node, moveNum, isWhite, path, depth) => {
       let html = "";
       node.children.forEach((child, index) => {
-        if (!child.san) return;
+        if (!child.san)
+          return;
         const childPath = [...path, child.san];
         const isVariation = index > 0;
         if (isVariation && depth === 0) {
@@ -1734,8 +1982,10 @@
         const isCurrent = pathEquals(childPath, currentPath);
         const isOnPath = pathIsPrefix(childPath, currentPath);
         const classes = ["move-item"];
-        if (isCurrent) classes.push("current");
-        if (isOnPath) classes.push("on-path");
+        if (isCurrent)
+          classes.push("current");
+        if (isOnPath)
+          classes.push("on-path");
         html += `<span class="${classes.join(" ")}" data-path='${JSON.stringify(childPath)}'>${child.san}</span>`;
         const nextMoveNum = isWhite ? moveNum : moveNum + 1;
         html += ` ${renderTree(child, nextMoveNum, !isWhite, childPath, isVariation ? depth + 1 : depth)}`;
@@ -1753,7 +2003,8 @@
     els.pgnViewer.querySelectorAll(".move-item").forEach((el) => {
       el.addEventListener("click", () => {
         const pathRaw = el.dataset.path;
-        if (!pathRaw) return;
+        if (!pathRaw)
+          return;
         try {
           const parsed = JSON.parse(pathRaw);
           dispatch({ tag: "AnalysisGoTo", path: parsed.map(asSan) });
@@ -1955,7 +2206,8 @@
     });
     els.pdfInput.addEventListener("change", () => {
       const file = els.pdfInput.files?.[0];
-      if (!file) return;
+      if (!file)
+        return;
       dispatch({ tag: "PdfFileSelected", file });
       els.pdfInput.value = "";
     });
@@ -1980,7 +2232,8 @@
     els.btnGotoPage.addEventListener("click", () => {
       const model = getModel();
       const next = Number.parseInt(els.pageInput.value, 10);
-      if (!Number.isFinite(next)) return;
+      if (!Number.isFinite(next))
+        return;
       dispatch({
         tag: "PageRequested",
         page: asPageNum(Math.min(Math.max(next, 1), model.pdf.totalPages))
@@ -1993,7 +2246,8 @@
     });
     els.zoomSlider.addEventListener("input", () => {
       const value = Number.parseInt(els.zoomSlider.value, 10);
-      if (!Number.isFinite(value)) return;
+      if (!Number.isFinite(value))
+        return;
       dispatch({ tag: "ZoomChanged", scale: value / 100 });
     });
     els.btnConfirmPieces.addEventListener("click", () => dispatch({ tag: "ConfirmPieces" }));
@@ -2058,11 +2312,16 @@
     els.btnRowFenDone.addEventListener("click", () => {
       const turn = els.fenTurnSelect.value;
       let castling = "";
-      if (els.castleK.checked) castling += "K";
-      if (els.castleQ.checked) castling += "Q";
-      if (els.castlek.checked) castling += "k";
-      if (els.castleq.checked) castling += "q";
-      if (!castling) castling = "-";
+      if (els.castleK.checked)
+        castling += "K";
+      if (els.castleQ.checked)
+        castling += "Q";
+      if (els.castlek.checked)
+        castling += "k";
+      if (els.castleq.checked)
+        castling += "q";
+      if (!castling)
+        castling = "-";
       dispatch({ tag: "FenSetupCompleted", turn, castling });
     });
     els.btnRowFenCancel.addEventListener("click", () => dispatch({ tag: "FenSetupCancelled" }));
@@ -2132,6 +2391,9 @@
           dispatch({ tag: "AnalysisDeleteVariation" });
           event.preventDefault();
           break;
+        case "p":
+          dispatch({ tag: "AnalysisPromoteVariation" });
+          break;
         default:
           break;
       }
@@ -2174,15 +2436,18 @@
   };
   var getSquareFromEvent = (event) => {
     const boardEl = document.getElementById("active-board");
-    if (!boardEl) return null;
+    if (!boardEl)
+      return null;
     const rect = boardEl.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height)
+      return null;
     const squareSize = rect.width / 8;
     const file = Math.floor(x / squareSize);
     const rank = 7 - Math.floor(y / squareSize);
-    if (file < 0 || file > 7 || rank < 0 || rank > 7) return null;
+    if (file < 0 || file > 7 || rank < 0 || rank > 7)
+      return null;
     const files = "abcdefgh";
     return `${files[file]}${rank + 1}`;
   };
@@ -2244,7 +2509,8 @@
     });
     els.boardOverlay.addEventListener("click", (event) => {
       console.log("[PALETTE] click on boardOverlay, selectedPiece:", selectedPiece);
-      if (!selectedPiece) return;
+      if (!selectedPiece)
+        return;
       if (!isEditable()) {
         dispatch({ tag: "Status", message: "Cannot edit board during analysis" });
         return;
@@ -2273,9 +2539,11 @@
         return;
       }
       const board = getPreviewBoard();
-      if (!board) return;
+      if (!board)
+        return;
       const square = getSquareFromEvent(event);
-      if (!square) return;
+      if (!square)
+        return;
       removePieceFromSquare(board, square, dispatch);
     });
   };
@@ -2308,7 +2576,8 @@
     };
     els.detectionOverlay.addEventListener("mousedown", (event) => {
       const model = getModel();
-      if (!model.pdf.id) return;
+      if (!model.pdf.id)
+        return;
       const target = event.target;
       if (target.classList.contains("detection-box") || target.classList.contains("resize-handle")) {
         return;
@@ -2327,12 +2596,14 @@
       dragState = { startX: x, startY: y, rect, mode: "manual" };
     });
     els.detectionOverlay.addEventListener("mousemove", (event) => {
-      if (!dragState) return;
+      if (!dragState)
+        return;
       const { x, y } = getLocalPoint(event);
       updateRect(dragState, x, y);
     });
     const endSelection = (event) => {
-      if (!dragState) return;
+      if (!dragState)
+        return;
       const model = getModel();
       const rect = dragState.rect;
       const width = Number.parseFloat(rect.getAttribute("width") ?? "0");
@@ -2425,7 +2696,8 @@
         return err("Invalid response");
       }
       const decoded = decodePdfInfo(data);
-      if (!decoded.ok) return decoded;
+      if (!decoded.ok)
+        return decoded;
       return ok({ exists: true, info: decoded.value });
     } catch (error) {
       return err(String(error));
@@ -2506,7 +2778,8 @@
         }
         return err("Recognition failed");
       }
-      if (!isRecord(data)) return err("Invalid response");
+      if (!isRecord(data))
+        return err("Invalid response");
       const fen = getString(data.fen);
       const confidence = getNumber(data.confidence);
       if (!fen || confidence === null) {
@@ -2540,7 +2813,8 @@
         }
         return err("Failed to extract moves");
       }
-      if (!isRecord(data)) return err("Invalid response");
+      if (!isRecord(data))
+        return err("Invalid response");
       const pdfText = getString(data.pdf_text) ?? "";
       const ocrText = getString(data.ocr_text) ?? "";
       return ok({ pdfText, ocrText });
@@ -2585,7 +2859,8 @@
         }
         return err("Failed to load study");
       }
-      if (!isRecord(data)) return err("Invalid response");
+      if (!isRecord(data))
+        return err("Invalid response");
       if (data.exists !== true || !isRecord(data.study)) {
         return ok(null);
       }
@@ -2682,7 +2957,8 @@
         }
         return err("Failed to sync board");
       }
-      if (!isRecord2(data)) return err("Invalid board response");
+      if (!isRecord2(data))
+        return err("Invalid board response");
       return ok({
         synced: Boolean(data.synced),
         driverSynced: Boolean(data.driver_synced),
@@ -2702,7 +2978,8 @@
       if (!response.ok) {
         return err("Board status unavailable");
       }
-      if (!isRecord2(data)) return err("Invalid board status");
+      if (!isRecord2(data))
+        return err("Invalid board status");
       return ok({
         available: Boolean(data.available),
         connected: Boolean(data.connected)
@@ -2791,10 +3068,12 @@
   // static/ts/ports/stockfish.ts
   var parseScore = (line) => {
     const match = line.match(/score (cp|mate) (-?\d+)/);
-    if (!match) return null;
+    if (!match)
+      return null;
     const type = match[1];
     const value = Number.parseInt(match[2], 10);
-    if (Number.isNaN(value)) return null;
+    if (Number.isNaN(value))
+      return null;
     if (type === "cp") {
       const evalText = (value / 100).toFixed(2);
       return value >= 0 ? `+${evalText}` : evalText;
@@ -2803,7 +3082,8 @@
   };
   var parsePv = (line) => {
     const match = line.match(/pv (.+)/);
-    if (!match) return null;
+    if (!match)
+      return null;
     return match[1].split(" ").slice(0, 8).join(" ");
   };
   var createStockfish = (onInfo) => {
@@ -2906,18 +3186,21 @@
         resources.previewBoard?.destroy();
         resources.previewBoard = null;
         const onDrop = mode === "analysis" ? (source, target) => {
-          if (!resources.analysisGame) return "snapback";
+          if (!resources.analysisGame)
+            return "snapback";
           const move = resources.analysisGame.move({
             from: source,
             to: target,
             promotion: "q"
           });
-          if (!move) return "snapback";
+          if (!move)
+            return "snapback";
           dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.analysisGame.fen()) });
           return void 0;
         } : void 0;
         const onSnapEnd = mode === "analysis" ? () => {
-          if (!resources.analysisGame || !resources.previewBoard) return;
+          if (!resources.analysisGame || !resources.previewBoard)
+            return;
           resources.previewBoard.position(resources.analysisGame.fen());
         } : void 0;
         resources.previewBoard = createBoard("active-board", {
@@ -2950,7 +3233,8 @@
       const workflow = model.workflow;
       const isEditing = model.ui.editingPosition;
       const isSettingUpFen = model.ui.settingUpFen;
-      const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "");
+      const orientation = model.ui.boardOrientation;
+      const modeKey = workflow.tag + (isEditing ? "-edit" : "") + (isSettingUpFen ? "-fen" : "") + `-${orientation}`;
       if (workflow.tag === "NO_PDF" || workflow.tag === "VIEWING") {
         if (resources.boardRow.currentMode !== null) {
           resources.boardRow.before?.destroy();
@@ -2974,7 +3258,8 @@
               dropOffBoard: isEditing ? "trash" : "snapback",
               sparePieces: isEditing,
               showNotation: false,
-              pieceTheme: pieceTheme2
+              pieceTheme: pieceTheme2,
+              orientation
             });
             resources.boardRow.before = null;
             resources.boardRow.after = null;
@@ -2988,14 +3273,16 @@
                 position: String(selectedGame.fen),
                 draggable: false,
                 showNotation: false,
-                pieceTheme: pieceTheme2
+                pieceTheme: pieceTheme2,
+                orientation
               });
             }
             resources.boardRow.now = createBoard("now-board", {
               position: String(workflow.pending.targetFen),
               draggable: false,
               showNotation: false,
-              pieceTheme: pieceTheme2
+              pieceTheme: pieceTheme2,
+              orientation
             });
             resources.boardRow.after = null;
             break;
@@ -3007,11 +3294,14 @@
               position: String(session.startFen).split(" ")[0],
               draggable: false,
               showNotation: false,
-              pieceTheme: pieceTheme2
+              pieceTheme: pieceTheme2,
+              orientation
             });
             const onDragStart = (_source, piece) => {
-              if (!resources.boardRow.nowGame) return false;
-              if (resources.boardRow.nowGame.game_over()) return false;
+              if (!resources.boardRow.nowGame)
+                return false;
+              if (resources.boardRow.nowGame.game_over())
+                return false;
               const turn = resources.boardRow.nowGame.turn();
               if (turn === "w" && piece.startsWith("b") || turn === "b" && piece.startsWith("w")) {
                 return false;
@@ -3019,14 +3309,17 @@
               return true;
             };
             const onDrop = (source, target) => {
-              if (!resources.boardRow.nowGame) return "snapback";
+              if (!resources.boardRow.nowGame)
+                return "snapback";
               const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
-              if (!move) return "snapback";
+              if (!move)
+                return "snapback";
               dispatch({ tag: "ReachMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
               return void 0;
             };
             const onSnapEnd = () => {
-              if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+              if (!resources.boardRow.nowGame || !resources.boardRow.now)
+                return;
               resources.boardRow.now.position(resources.boardRow.nowGame.fen());
             };
             resources.boardRow.now = createBoard("now-board", {
@@ -3034,6 +3327,7 @@
               draggable: true,
               showNotation: true,
               pieceTheme: pieceTheme2,
+              orientation,
               onDragStart,
               onDrop,
               onSnapEnd
@@ -3042,7 +3336,8 @@
               position: String(session.targetFen),
               draggable: false,
               showNotation: false,
-              pieceTheme: pieceTheme2
+              pieceTheme: pieceTheme2,
+              orientation
             });
             break;
           }
@@ -3064,14 +3359,17 @@
             }
             resources.boardRow.nowGame = new Chess(currentFen);
             const onDrop = (source, target) => {
-              if (!resources.boardRow.nowGame) return "snapback";
+              if (!resources.boardRow.nowGame)
+                return "snapback";
               const move = resources.boardRow.nowGame.move({ from: source, to: target, promotion: "q" });
-              if (!move) return "snapback";
+              if (!move)
+                return "snapback";
               dispatch({ tag: "AnalysisMoveMade", san: asSan(move.san), fen: asFenFull(resources.boardRow.nowGame.fen()) });
               return void 0;
             };
             const onSnapEnd = () => {
-              if (!resources.boardRow.nowGame || !resources.boardRow.now) return;
+              if (!resources.boardRow.nowGame || !resources.boardRow.now)
+                return;
               resources.boardRow.now.position(resources.boardRow.nowGame.fen());
             };
             resources.boardRow.now = createBoard("now-board", {
@@ -3079,6 +3377,7 @@
               draggable: true,
               showNotation: true,
               pieceTheme: pieceTheme2,
+              orientation,
               onDrop,
               onSnapEnd
             });
@@ -3314,11 +3613,13 @@
           return;
         }
         case "CHESSNUT_POLL_START": {
+          console.log("[DEBUG] CHESSNUT_POLL_START - starting poll every", cmd.everyMs, "ms");
           if (resources.chessnutPollTimer) {
             window.clearInterval(resources.chessnutPollTimer);
           }
           const timer = window.setInterval(async () => {
             const result = await fetchFen();
+            console.log("[DEBUG] fetchFen result:", result);
             if (result.ok) {
               dispatch({ tag: "BoardFenUpdated", fen: result.value });
             }
@@ -3393,7 +3694,6 @@
             dispatch({ tag: "PiecesConfirmed", placement });
           }
           return;
-        // OPEN_REACH_MODAL and CLOSE_REACH_MODAL removed - board row handles reach mode now
         case "REACH_SET_MOVES":
           dispatch({ tag: "ReachTargetResolved", moves: cmd.moves, finalFen: cmd.finalFen, turn: null });
           return;
@@ -3437,8 +3737,42 @@
 
   // static/ts/main.ts
   pdfjsLib.GlobalWorkerOptions.workerSrc = "/static/vendor/js/pdf.worker.min.js";
+  window.loadDebugPdf = async () => {
+    const waitForDispatch = () => {
+      return new Promise((resolve) => {
+        const check = () => {
+          if (window.__ocvDispatch) {
+            resolve(window.__ocvDispatch);
+          } else {
+            setTimeout(check, 50);
+          }
+        };
+        check();
+      });
+    };
+    try {
+      const dispatch = await waitForDispatch();
+      const resp = await fetch("/api/debug-load");
+      if (!resp.ok) {
+        console.error("Debug load failed:", resp.status);
+        return;
+      }
+      const data = await resp.json();
+      console.log("[DEBUG] loadDebugPdf response:", data);
+      dispatch({
+        tag: "PdfOpened",
+        pdfId: data.pdf_id,
+        pages: data.pages,
+        filename: data.filename,
+        contentHash: data.content_hash
+      });
+    } catch (e) {
+      console.error("Debug load error:", e);
+    }
+  };
   window.addEventListener("DOMContentLoaded", () => {
-    createRuntime(initialModel);
+    const { dispatch } = createRuntime(initialModel);
+    window.__ocvDispatch = dispatch;
   });
 })();
 //# sourceMappingURL=reader.bundle.js.map

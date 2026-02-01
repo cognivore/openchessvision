@@ -205,6 +205,9 @@ export const bindEvents = (dispatch: Dispatch, getModel: GetModel): void => {
                 dispatch({ tag: "AnalysisDeleteVariation" });
                 event.preventDefault();
                 break;
+            case "p":
+                dispatch({ tag: "AnalysisPromoteVariation" });
+                break;
             default:
                 break;
         }
