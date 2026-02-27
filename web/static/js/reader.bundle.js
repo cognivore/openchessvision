@@ -1495,17 +1495,33 @@
         const pgn = toPGN(ctx.tree);
         return [model, [{ tag: "CLIPBOARD_WRITE", text: pgn }]];
       }
-      case "BoardOrientationChanged":
+      case "BoardOrientationChanged": {
+        const orientGameId = getActiveGameId(model.workflow);
+        const orientGame = orientGameId ? model.games.find((g) => g.id === orientGameId) : null;
+        let orientFen = orientGame?.fen ?? null;
+        if (model.workflow.tag === "ANALYSIS" && model.workflow.cursor.length > 0) {
+          const orientTree = model.analyses[model.workflow.activeGameId];
+          if (orientTree) {
+            const node = getNode(orientTree.root, model.workflow.cursor);
+            if (node)
+              orientFen = extractPlacement(node.fen);
+          }
+        }
+        const cmds = [
+          { tag: "CHESSBOARD_FLIP", orientation: msg.orientation },
+          { tag: "CHESSNUT_SET_ORIENTATION", orientation: msg.orientation }
+        ];
+        if (orientFen) {
+          cmds.push({ tag: "CHESSNUT_SET_FEN", fen: orientFen, force: true });
+        }
         return [
           {
             ...model,
             ui: { ...model.ui, boardOrientation: msg.orientation }
           },
-          [
-            { tag: "CHESSBOARD_FLIP", orientation: msg.orientation },
-            { tag: "CHESSNUT_SET_ORIENTATION", orientation: msg.orientation }
-          ]
+          cmds
         ];
+      }
       case "OpeningsInputShown":
         return [
           {
