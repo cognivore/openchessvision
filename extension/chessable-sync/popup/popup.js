@@ -9,6 +9,7 @@ const statusText = $("status-text");
 const fenDisplay = $("fen-display");
 const apiUrlInput = $("api-url");
 const reconnectBtn = $("reconnect-btn");
+const orientBtns = document.querySelectorAll(".orient-btn");
 
 function setStatus(dotClass, text) {
   statusDot.className = "dot " + dotClass;
@@ -19,6 +20,11 @@ function renderState(s) {
   enabledToggle.checked = s.enabled;
   toggleLabel.textContent = s.enabled ? "ON" : "OFF";
   apiUrlInput.value = s.apiUrl || "http://localhost:5000";
+
+  const mode = s.orientationMode || "auto";
+  orientBtns.forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.orient === mode);
+  });
 
   if (!s.enabled) {
     setStatus("gray", "Sync disabled");
@@ -56,6 +62,13 @@ apiUrlInput.addEventListener("input", () => {
     const apiUrl = apiUrlInput.value.replace(/\/+$/, "");
     chrome.runtime.sendMessage({ type: "SET_CONFIG", apiUrl }, fetchState);
   }, 500);
+});
+
+orientBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const orientationMode = btn.dataset.orient;
+    chrome.runtime.sendMessage({ type: "SET_CONFIG", orientationMode }, fetchState);
+  });
 });
 
 reconnectBtn.addEventListener("click", () => {

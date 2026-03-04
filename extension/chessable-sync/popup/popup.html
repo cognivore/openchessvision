@@ -108,6 +108,32 @@
       color: #999;
       margin-top: 3px;
     }
+    .orient-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 8px;
+    }
+    .orient-row .config-label { margin: 0 8px 0 0; flex-shrink: 0; }
+    .orient-btn {
+      flex: 1;
+      padding: 4px 0;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      color: #555;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .orient-btn:first-of-type { border-radius: 4px 0 0 4px; }
+    .orient-btn:last-of-type { border-radius: 0 4px 4px 0; }
+    .orient-btn + .orient-btn { border-left: none; }
+    .orient-btn.active {
+      background: #1a1a2e;
+      color: #fff;
+      border-color: #1a1a2e;
+    }
     .reconnect-btn {
       display: block;
       width: 100%;
@@ -144,6 +170,12 @@
       <span class="status-label" id="status-text">Waiting...</span>
     </div>
     <div class="fen-display" id="fen-display">--</div>
+    <div class="orient-row">
+      <span class="config-label">Orientation</span>
+      <button class="orient-btn active" data-orient="auto">Auto</button>
+      <button class="orient-btn" data-orient="white">White</button>
+      <button class="orient-btn" data-orient="black">Black</button>
+    </div>
     <button class="reconnect-btn" id="reconnect-btn">Reconnect</button>
   </div>
 

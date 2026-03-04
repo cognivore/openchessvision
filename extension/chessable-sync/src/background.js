@@ -12,6 +12,7 @@ let state = {
   lastSyncTime: null,
   boardPresent: false,
   apiUrl: DEFAULT_API_URL,
+  orientationMode: "auto",
 };
 
 let chessableTabId = null;
@@ -28,6 +29,7 @@ async function loadConfig() {
     const result = await chrome.storage.sync.get({
       apiUrl: DEFAULT_API_URL,
       enabled: true,
+      orientationMode: "auto",
     });
     // Migrate away from stale default that pointed at wrong port
     if (result.apiUrl === "http://localhost:5000") {
@@ -36,6 +38,7 @@ async function loadConfig() {
     }
     state.apiUrl = result.apiUrl;
     state.enabled = result.enabled;
+    state.orientationMode = result.orientationMode;
   } catch {
     // storage unavailable, keep defaults
   }
@@ -148,7 +151,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         setBadge("ON", BADGE_SYNCING);
         startBoardPoll();
       }
-      if (msg.orientation && msg.orientation !== state.lastOrientation) {
+      if (state.orientationMode === "auto" && msg.orientation && msg.orientation !== state.lastOrientation) {
         state.lastOrientation = msg.orientation;
         promises.push(syncOrientation(msg.orientation));
       }
@@ -205,15 +208,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         lastSyncTime: state.lastSyncTime,
         boardPresent: state.boardPresent,
         apiUrl: state.apiUrl,
+        orientationMode: state.orientationMode,
       });
       return false;
 
     case "SET_CONFIG":
       if (msg.apiUrl !== undefined) state.apiUrl = msg.apiUrl;
       if (msg.enabled !== undefined) state.enabled = msg.enabled;
+      if (msg.orientationMode !== undefined) {
+        state.orientationMode = msg.orientationMode;
+        const target = msg.orientationMode === "auto" ? state.lastOrientation : msg.orientationMode;
+        if (target) {
+          state.lastOrientation = target;
+          syncOrientation(target);
+        }
+      }
       chrome.storage.sync.set({
         apiUrl: state.apiUrl,
         enabled: state.enabled,
+        orientationMode: state.orientationMode,
       });
       if (!state.enabled) {
         setBadge("OFF", BADGE_IDLE);
