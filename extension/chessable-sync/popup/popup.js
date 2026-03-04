@@ -8,6 +8,7 @@ const statusDot = $("status-dot");
 const statusText = $("status-text");
 const fenDisplay = $("fen-display");
 const apiUrlInput = $("api-url");
+const reconnectBtn = $("reconnect-btn");
 
 function setStatus(dotClass, text) {
   statusDot.className = "dot " + dotClass;
@@ -55,6 +56,18 @@ apiUrlInput.addEventListener("input", () => {
     const apiUrl = apiUrlInput.value.replace(/\/+$/, "");
     chrome.runtime.sendMessage({ type: "SET_CONFIG", apiUrl }, fetchState);
   }, 500);
+});
+
+reconnectBtn.addEventListener("click", () => {
+  reconnectBtn.textContent = "Reconnecting...";
+  reconnectBtn.disabled = true;
+  chrome.runtime.sendMessage({ type: "RECONNECT" }, () => {
+    setTimeout(() => {
+      reconnectBtn.textContent = "Reconnect";
+      reconnectBtn.disabled = false;
+      fetchState();
+    }, 500);
+  });
 });
 
 fetchState();

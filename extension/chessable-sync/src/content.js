@@ -4,6 +4,7 @@
 
 const BOARD_SELECTORS = ["#board", '[data-testid="boardContainer"]'];
 const DEBOUNCE_MS = 300;
+const SETTLE_MS = 600;
 
 let lastFen = null;
 let lastOrientation = null;
@@ -22,6 +23,13 @@ function findBoard() {
 
 function onBoardMutation() {
   clearTimeout(debounceTimer);
+  if (simulatingMove) {
+    debounceTimer = setTimeout(() => {
+      simulatingMove = false;
+      readAndRelay();
+    }, SETTLE_MS);
+    return;
+  }
   debounceTimer = setTimeout(readAndRelay, DEBOUNCE_MS);
 }
 
@@ -144,7 +152,11 @@ function playMoveOnBoard(from, to) {
   simulateClick(fromEl);
   setTimeout(() => {
     simulateClick(toEl);
-    setTimeout(() => { simulatingMove = false; }, 500);
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      simulatingMove = false;
+      readAndRelay();
+    }, SETTLE_MS);
   }, 100);
 }
 
@@ -155,6 +167,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       playMoveOnBoard(move.from, move.to);
     }
     sendResponse({ ok: !!move });
+  } else if (msg.type === "RECONNECT") {
+    detachBoardObserver();
+    lastFen = null;
+    lastOrientation = null;
+    simulatingMove = false;
+    clearTimeout(debounceTimer);
+    const found = tryAttach();
+    sendResponse({ ok: found });
   }
   return false;
 });

@@ -17,6 +17,7 @@ let state = {
 let chessableTabId = null;
 let boardPollTimer = null;
 let physicalMoveInFlight = false;
+let lastAttemptedFen = null;
 
 function getApiUrl() {
   return state.apiUrl;
@@ -104,13 +105,22 @@ async function pollPhysicalBoard() {
     if (!resp.ok) return;
     const data = await resp.json();
     const placement = data.fen ? data.fen.split(" ")[0] : null;
-    if (placement && placement !== state.lastFen) {
-      physicalMoveInFlight = true;
-      setTimeout(() => { physicalMoveInFlight = false; }, 3000);
-      chrome.tabs.sendMessage(chessableTabId, { type: "PHYSICAL_FEN", placement }).catch(() => {
-        physicalMoveInFlight = false;
-      });
+    if (!placement) return;
+
+    if (placement === state.lastFen) {
+      lastAttemptedFen = null;
+      return;
     }
+
+    // Don't retry a FEN that chessable already rejected
+    if (placement === lastAttemptedFen) return;
+
+    lastAttemptedFen = placement;
+    physicalMoveInFlight = true;
+    setTimeout(() => { physicalMoveInFlight = false; }, 3000);
+    chrome.tabs.sendMessage(chessableTabId, { type: "PHYSICAL_FEN", placement }).catch(() => {
+      physicalMoveInFlight = false;
+    });
   } catch {
     // poll failure, ignore
   }
@@ -127,6 +137,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg.type) {
     case "FEN_UPDATE": {
       physicalMoveInFlight = false;
+      if (msg.fen === lastAttemptedFen) lastAttemptedFen = null;
       const promises = [];
       if (msg.fenChanged) {
         state.lastFen = msg.fen;
@@ -150,10 +161,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "BOARD_LOST":
       state.boardPresent = false;
       state.lastFen = null;
+      lastAttemptedFen = null;
       stopBoardPoll();
       setBadge("", BADGE_IDLE);
       sendResponse({ ok: true });
       return false;
+
+    case "RECONNECT": {
+      lastAttemptedFen = null;
+      physicalMoveInFlight = false;
+      stopBoardPoll();
+      if (chessableTabId !== null) {
+        chrome.tabs.sendMessage(chessableTabId, { type: "RECONNECT" }, (resp) => {
+          sendResponse(resp || { ok: false });
+        });
+        return true;
+      }
+      sendResponse({ ok: false, reason: "no tab" });
+      return false;
+    }
 
     case "CONTENT_READY":
       sendResponse({ ok: true });
