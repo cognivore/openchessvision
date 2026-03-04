@@ -137,11 +137,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg.type) {
     case "FEN_UPDATE": {
       physicalMoveInFlight = false;
-      if (msg.fen === lastAttemptedFen) lastAttemptedFen = null;
       const promises = [];
       if (msg.fenChanged) {
         state.lastFen = msg.fen;
+        lastAttemptedFen = null;
         promises.push(syncFen(msg.fen, true));
+      }
+      if (!state.boardPresent) {
+        state.boardPresent = true;
+        setBadge("ON", BADGE_SYNCING);
+        startBoardPoll();
       }
       if (msg.orientationChanged) {
         state.lastOrientation = msg.orientation;
@@ -180,6 +185,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, reason: "no tab" });
       return false;
     }
+
+    case "HEARTBEAT":
+      if (state.boardPresent && !boardPollTimer) {
+        startBoardPoll();
+      }
+      sendResponse({ ok: true });
+      return false;
 
     case "CONTENT_READY":
       sendResponse({ ok: true });

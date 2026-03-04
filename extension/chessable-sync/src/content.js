@@ -179,6 +179,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
+// Keep service worker alive and recover polling if it was restarted
+setInterval(() => {
+  if (boardObserver) {
+    chrome.runtime.sendMessage({ type: "HEARTBEAT" }).catch(() => {});
+  }
+}, 20000);
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
 } else {
