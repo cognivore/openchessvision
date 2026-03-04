@@ -148,7 +148,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         setBadge("ON", BADGE_SYNCING);
         startBoardPoll();
       }
-      if (msg.orientationChanged) {
+      if (msg.orientation && msg.orientation !== state.lastOrientation) {
         state.lastOrientation = msg.orientation;
         promises.push(syncOrientation(msg.orientation));
       }
