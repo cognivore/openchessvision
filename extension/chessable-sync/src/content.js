@@ -4,14 +4,16 @@
 
 const BOARD_SELECTORS = ["#board", '[data-testid="boardContainer"]'];
 const DEBOUNCE_MS = 300;
-const SETTLE_MS = 600;
+const SETTLE_MS = 300;
 
 let lastFen = null;
 let lastOrientation = null;
 let boardObserver = null;
 let bodyObserver = null;
 let debounceTimer = null;
-let simulatingMove = false;
+let settleTimer = null;
+let awaitingSimResult = false;
+let fenHistory = new Set();
 
 function findBoard() {
   for (const sel of BOARD_SELECTORS) {
@@ -22,19 +24,21 @@ function findBoard() {
 }
 
 function onBoardMutation() {
-  clearTimeout(debounceTimer);
-  if (simulatingMove) {
-    debounceTimer = setTimeout(() => {
-      simulatingMove = false;
+  if (awaitingSimResult) {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      awaitingSimResult = false;
       readAndRelay();
     }, SETTLE_MS);
     return;
   }
+  clearTimeout(debounceTimer);
   debounceTimer = setTimeout(readAndRelay, DEBOUNCE_MS);
 }
 
 function readAndRelay() {
-  if (simulatingMove) return;
+  if (awaitingSimResult) return;
+
   const boardEl = findBoard();
   if (!boardEl) return;
 
@@ -46,8 +50,12 @@ function readAndRelay() {
 
   if (!fenChanged && !orientationChanged) return;
 
+  const rollback = fenChanged && fenHistory.has(result.fen);
+
   lastFen = result.fen;
   lastOrientation = result.orientation;
+
+  if (!rollback) fenHistory.add(result.fen);
 
   chrome.runtime.sendMessage({
     type: "FEN_UPDATE",
@@ -55,6 +63,7 @@ function readAndRelay() {
     orientation: result.orientation,
     fenChanged,
     orientationChanged,
+    rollback,
   });
 }
 
@@ -69,7 +78,6 @@ function attachBoardObserver(boardEl) {
     attributeFilter: ["data-piece", "style"],
   });
 
-  // Initial read
   readAndRelay();
 
   chrome.runtime.sendMessage({ type: "BOARD_FOUND" });
@@ -108,6 +116,9 @@ function watchForBoard() {
       detachBoardObserver();
       lastFen = null;
       lastOrientation = null;
+      awaitingSimResult = false;
+      clearTimeout(settleTimer);
+      fenHistory.clear();
       chrome.runtime.sendMessage({ type: "BOARD_LOST" });
     }
   });
@@ -148,16 +159,9 @@ function playMoveOnBoard(from, to) {
   const toEl = boardEl.querySelector(`[data-square="${to}"]`);
   if (!fromEl || !toEl) return;
 
-  simulatingMove = true;
+  awaitingSimResult = true;
   simulateClick(fromEl);
-  setTimeout(() => {
-    simulateClick(toEl);
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      simulatingMove = false;
-      readAndRelay();
-    }, SETTLE_MS);
-  }, 100);
+  setTimeout(() => simulateClick(toEl), 100);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -171,8 +175,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     detachBoardObserver();
     lastFen = null;
     lastOrientation = null;
-    simulatingMove = false;
+    awaitingSimResult = false;
+    clearTimeout(settleTimer);
     clearTimeout(debounceTimer);
+    fenHistory.clear();
     const found = tryAttach();
     sendResponse({ ok: found });
   }
@@ -181,8 +187,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 // Keep service worker alive and recover polling if it was restarted
 setInterval(() => {
-  if (boardObserver) {
-    chrome.runtime.sendMessage({ type: "HEARTBEAT" }).catch(() => {});
+  try {
+    if (boardObserver) {
+      chrome.runtime.sendMessage({ type: "HEARTBEAT" }).catch(() => {});
+    }
+  } catch {
+    // Extension context invalidated after reload
   }
 }, 20000);
 

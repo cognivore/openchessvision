@@ -17,8 +17,10 @@ let state = {
 
 let chessableTabId = null;
 let boardPollTimer = null;
-let physicalMoveInFlight = false;
-let lastAttemptedFen = null;
+
+let locked = false;
+let lockFen = null;
+let lastSentPlacement = null;
 
 function getApiUrl() {
   return state.apiUrl;
@@ -31,7 +33,6 @@ async function loadConfig() {
       enabled: true,
       orientationMode: "auto",
     });
-    // Migrate away from stale default that pointed at wrong port
     if (result.apiUrl === "http://localhost:5000") {
       result.apiUrl = DEFAULT_API_URL;
       await chrome.storage.sync.set({ apiUrl: DEFAULT_API_URL });
@@ -101,8 +102,14 @@ function stopBoardPoll() {
   }
 }
 
+function resetLock() {
+  locked = false;
+  lockFen = null;
+  lastSentPlacement = null;
+}
+
 async function pollPhysicalBoard() {
-  if (!state.enabled || !state.boardPresent || chessableTabId === null || physicalMoveInFlight) return;
+  if (!state.enabled || !state.boardPresent || chessableTabId === null) return;
   try {
     const resp = await fetch(`${getApiUrl()}/api/board/fen`, { signal: AbortSignal.timeout(2000) });
     if (!resp.ok) return;
@@ -110,20 +117,23 @@ async function pollPhysicalBoard() {
     const placement = data.fen ? data.fen.split(" ")[0] : null;
     if (!placement) return;
 
-    if (placement === state.lastFen) {
-      lastAttemptedFen = null;
+    if (locked) {
+      if (placement === lockFen) {
+        console.debug("[chessable-sync] physical board complied, unlocking");
+        resetLock();
+      }
       return;
     }
 
-    // Don't retry a FEN that chessable already rejected
-    if (placement === lastAttemptedFen) return;
+    if (placement === state.lastFen) {
+      lastSentPlacement = null;
+      return;
+    }
 
-    lastAttemptedFen = placement;
-    physicalMoveInFlight = true;
-    setTimeout(() => { physicalMoveInFlight = false; }, 3000);
-    chrome.tabs.sendMessage(chessableTabId, { type: "PHYSICAL_FEN", placement }).catch(() => {
-      physicalMoveInFlight = false;
-    });
+    if (placement === lastSentPlacement) return;
+
+    lastSentPlacement = placement;
+    chrome.tabs.sendMessage(chessableTabId, { type: "PHYSICAL_FEN", placement }).catch(() => {});
   } catch {
     // poll failure, ignore
   }
@@ -139,24 +149,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   switch (msg.type) {
     case "FEN_UPDATE": {
-      physicalMoveInFlight = false;
       const promises = [];
+
       if (msg.fenChanged) {
         state.lastFen = msg.fen;
-        lastAttemptedFen = null;
-        promises.push(syncFen(msg.fen, true));
+
+        if (msg.rollback) {
+          locked = true;
+          lockFen = msg.fen;
+          console.debug("[chessable-sync] rollback detected, locking to", lockFen);
+          promises.push(syncFen(msg.fen, true));
+        } else {
+          const fromPhysical = msg.fen === lastSentPlacement;
+          resetLock();
+          if (!fromPhysical) {
+            locked = true;
+            lockFen = msg.fen;
+            promises.push(syncFen(msg.fen, true));
+          }
+        }
       }
+
       if (!state.boardPresent) {
         state.boardPresent = true;
         setBadge("ON", BADGE_SYNCING);
         startBoardPoll();
       }
+
       if (state.orientationMode === "auto" && msg.orientation && msg.orientation !== state.lastOrientation) {
         state.lastOrientation = msg.orientation;
         promises.push(syncOrientation(msg.orientation));
       }
+
       Promise.all(promises).then(() => sendResponse({ ok: true }));
-      return true; // async response
+      return true;
     }
 
     case "BOARD_FOUND":
@@ -169,15 +195,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "BOARD_LOST":
       state.boardPresent = false;
       state.lastFen = null;
-      lastAttemptedFen = null;
+      resetLock();
       stopBoardPoll();
       setBadge("", BADGE_IDLE);
       sendResponse({ ok: true });
       return false;
 
     case "RECONNECT": {
-      lastAttemptedFen = null;
-      physicalMoveInFlight = false;
+      resetLock();
       stopBoardPoll();
       if (chessableTabId !== null) {
         chrome.tabs.sendMessage(chessableTabId, { type: "RECONNECT" }, (resp) => {
